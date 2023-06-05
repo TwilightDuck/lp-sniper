@@ -74,7 +74,7 @@ export class Minswap {
 
   async getPrice(asset: string): Promise<BigInt> {
     const api = new BlockfrostAdapter({
-      projectId: env.process.BLOCKFROST_KEY,
+      projectId: process.env.BLOCKFROST_KEY,
       networkId: NetworkId.MAINNET,
     });
     for (let i = 1; ; i++) {
