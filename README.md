@@ -1,1 +1,1 @@
-# memebot
+# LP Sniper
