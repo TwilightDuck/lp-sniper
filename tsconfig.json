@@ -1,0 +1,38 @@
+{
+    "compilerOptions": {
+        "target": "ESNext",
+        "module": "ESNext",
+        "moduleResolution": "Node",
+        "allowJs": true,
+        "allowSyntheticDefaultImports": true,
+        "noFallthroughCasesInSwitch": true,
+        "resolveJsonModule": true,
+        "downlevelIteration": true,
+        "skipLibCheck": true,
+        "strict": false,
+        "esModuleInterop": true,
+        "rootDir": "./src",
+        "baseUrl": ".",
+        "outDir": "./dist",
+        "declaration": false,
+        "declarationMap": false,
+        "noEmitOnError": true,
+    },
+    "exclude": [
+        "node_modules",
+        "dist"
+    ],
+    "experiments": {
+        "asyncWebAssembly": true,
+        "topLevelAwait": true,
+        "layers": true
+        // optional, with some bundlers/frameworks it doesn't work without
+    },
+    "ts-node": {
+        "esm": true,
+        "compilerOptions": {
+            "module": "ESNext",
+            "target": "ESNext"
+        }
+    }
+}
