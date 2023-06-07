@@ -95,13 +95,13 @@ async function processSundaeswap(output: TxOut, poolId: string) {
     return;
   }
 
-  sendSundaeSwapTx(determinePurchaseAmount(output), asset, poolId).then((txHash: TxHash) => {
-    recentPurchases.push(asset);
-  });
+  // sendSundaeSwapTx(determinePurchaseAmount(output), asset, poolId).then((txHash: TxHash) => {
+  //   recentPurchases.push(asset);
+  // });
 
-  logger.info(
-    `Buying ${asset} with an input of ${determinePurchaseAmount(output).toLocaleString()}`
-  );
+  // logger.info(
+  //   `Buying ${asset} with an input of ${determinePurchaseAmount(output).toLocaleString()}`
+  // );
 
 
 }
@@ -175,38 +175,38 @@ async function sendMinswapSwapTx(amount: bigint, asset: string) {
   return txHash;
 }
 
-async function sendSundaeSwapTx(amount: bigint, asset: string, poolId: string) {
-  const lucid: Lucid = await Lucid.new(
-    new OgmiosProvider(ogmios.submissionClient, ogmios.stateClient),
-    "Mainnet"
-  );
-  const seedPhrase = process.env.SEED_PHRASE;
-  lucid.selectWalletFromSeed(seedPhrase);
+// async function sendSundaeSwapTx(amount: bigint, asset: string, poolId: string) {
+//   const lucid: Lucid = await Lucid.new(
+//     new OgmiosProvider(ogmios.submissionClient, ogmios.stateClient),
+//     "Mainnet"
+//   );
+//   const seedPhrase = process.env.SEED_PHRASE;
+//   lucid.selectWalletFromSeed(seedPhrase);
 
 
 
-  const options = {
-    sender: await lucid.wallet.address(),
-    assetIn: {
-      unit: "lovelace",
-      quantity: amount,
-    },
-    assetOut: asset,
-    minimumAmountOut: 1n,
-  };
+//   const options = {
+//     sender: await lucid.wallet.address(),
+//     assetIn: {
+//       unit: "lovelace",
+//       quantity: amount,
+//     },
+//     assetOut: asset,
+//     minimumAmountOut: 1n,
+//   };
 
-  let sundaeswap = new Sundaeswap(lucid);
-  let tx = await sundaeswap.buildExactInOrder(options);
+//   let sundaeswap = new Sundaeswap(lucid);
+//   let tx = await sundaeswap.buildExactInOrder(options);
 
-  const signedTx = await tx.sign().complete();
+//   const signedTx = await tx.sign().complete();
 
-  let txHash = await signedTx.submit();
+//   let txHash = await signedTx.submit();
 
-  if (txHash === null) {
-    return;
-  }
+//   if (txHash === null) {
+//     return;
+//   }
 
-  console.log(txHash);
-  return txHash;
-}
+//   console.log(txHash);
+//   return txHash;
+// }
 main();

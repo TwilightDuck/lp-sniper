@@ -1,13 +1,26 @@
 import { TxAlonzo, TxOut } from "@cardano-ogmios/schema";
-import { Constr, Assets, Lucid, TxComplete, Data, UTxO, Tx } from "lucid-cardano";
 import { Sundae } from "./constants.js";
-import { Transaction, TxBuilder } from "@sundaeswap/sdk-core";
+import {
+  AssetAmount,
+  IAsset,
+  OrderAddresses,
+  Swap,
+} from "@sundaeswap/sdk-core";
+import {
+  Assets,
+  C,
+  Constr,
+  Data,
+  Lucid,
+  getAddressDetails,
+} from "lucid-cardano";
 
 const CREATE_POOL_HASH =
   "d2a93d4de0bcd8309793e832f98a843d23639cb19d9ed3d73d503ac267dcf88d";
 
-export function isSundaeswapPool(tx: TxAlonzo): false | { output: TxOut, poolId: string } {
-
+export function isSundaeswapPool(
+  tx: TxAlonzo
+): false | { output: TxOut; poolId: string } {
   if (tx.metadata?.hash !== CREATE_POOL_HASH) {
     return false;
   }
@@ -28,7 +41,6 @@ export function isSundaeswapPool(tx: TxAlonzo): false | { output: TxOut, poolId:
     return false;
   }
 
-
   const poolId = Object.keys(output.value.assets)
     .map((asset: String) => asset.split(".").shift())
     .find((policyId: String) => policyId === Sundae.LP_NFT_POLICY_ID);
@@ -43,30 +55,26 @@ export class Sundaeswap {
     this.lucid = lucid;
   }
 
-  async buildExactInOrder(ident, assetA, assetB, orderAddresses, suppliedAsset, minReceivable,) {
-
-
-    const datumBuilder = new DatumBuilderLucid("mainnet");
-    const { cbor } = datumBuilder.buildSwapDatum({
+  async buildExactInOrder(
+    ident,
+    orderAddresses: OrderAddresses,
+    amount: bigint
+  ) {
+    const datum = new Constr(0, [
       ident,
-      swap: {
-        SuppliedCoin: this.getAssetSwapDirection(suppliedAsset, [
-          assetA,
-          assetB,
-        ]),
-        MinimumReceivable: minReceivable,
-      },
-      orderAddresses,
-      fundedAsset: suppliedAsset,
-    });
+      this.buildOrderAddresses(orderAddresses).datum,
+      Sundae.SCOOPER_FEE,
+      new Constr(0, [new Constr(0, []), amount, new Constr(0, [1n])]),
+    ]);
 
-
-    const orderAssets: Assets = { [suppliedAsset.unit]: suppliedAsset.quantity };
-    orderAssets["lovelace"] = (orderAssets["lovelace"] || 0n) + Sundae.SCOOPER_FEE + Sundae.RIDER_FEE;
+    const orderAssets: Assets = { ["lovelace"]: amount };
+    orderAssets["lovelace"] =
+      (orderAssets["lovelace"] || 0n) + Sundae.SCOOPER_FEE + Sundae.RIDER_FEE;
 
     return await this.lucid
       .newTx()
-      .payToContract(Sundae.ESCROW_ADDRESS, Data.to(cbor), orderAssets)
+      .payToContract(Sundae.ESCROW_ADDRESS, Data.to(datum), orderAssets)
+      .attachMetadata(674, { msg: ["SSP: Swap Request"] })
       .complete();
   }
 
@@ -77,5 +85,75 @@ export class Sundaeswap {
     }
 
     return 0;
+  }
+
+  buildOrderAddresses(addresses: OrderAddresses) {
+    this._validateAddressesAreValid(addresses);
+    const { DestinationAddress, AlternateAddress } = addresses;
+    const destination = getAddressDetails(DestinationAddress.address);
+
+    const destinationDatum = new Constr(0, [
+      new Constr(0, [
+        new Constr(this._isScriptAddress(DestinationAddress.address) ? 1 : 0, [
+          destination.paymentCredential.hash,
+        ]),
+        destination?.stakeCredential.hash
+          ? new Constr(0, [
+              new Constr(0, [
+                new Constr(
+                  this._isScriptAddress(DestinationAddress.address) ? 1 : 0,
+                  [destination?.stakeCredential.hash]
+                ),
+              ]),
+            ])
+          : new Constr(1, []),
+      ]),
+      DestinationAddress?.datumHash
+        ? new Constr(0, [DestinationAddress.datumHash])
+        : new Constr(1, []),
+    ]);
+
+    const alternate = AlternateAddress && getAddressDetails(AlternateAddress);
+    const alternateDatum = new Constr(
+      alternate ? 0 : 1,
+      alternate ? [alternate.paymentCredential.hash] : []
+    );
+
+    const datum = new Constr(0, [destinationDatum, alternateDatum]);
+
+    return {
+      cbor: Data.to(datum),
+      hash: C.hash_plutus_data(
+        C.PlutusData.from_bytes(Buffer.from(Data.to(datum), "hex"))
+      )?.to_hex(),
+      datum,
+    };
+  }
+  private _isScriptAddress(address: string): boolean {
+    // Ensure that the address can be serialized.
+    const realAddress = C.Address.from_bech32(address);
+
+    // Ensure the datumHash is valid HEX if the address is a script.
+    const isScript = (realAddress.to_bytes()[0] & 0b00010000) !== 0;
+
+    return isScript;
+  }
+
+  private _validateAddressesAreValid(orderAddresses: OrderAddresses) {
+    const address = orderAddresses.DestinationAddress.address;
+    const datumHash = orderAddresses.DestinationAddress.datumHash;
+
+    const isScript = this._isScriptAddress(address);
+    if (isScript) {
+      if (datumHash) {
+        try {
+          C.DataHash.from_hex(datumHash);
+        } catch (e) {
+          throw new Error("whoops");
+        }
+      } else {
+        throw new Error("whoops");
+      }
+    }
   }
 }
