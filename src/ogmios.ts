@@ -45,7 +45,7 @@ export class Ogmios {
     createInteractionContext(
       (err) => console.error(err),
       () => console.log("Connection closed."),
-      { connection: { host: "localhost", port: 1337 } }
+      { connection: { host: "192.168.1.73", port: 1337 } }
     );
 
   async fetchTransactions() {

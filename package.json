@@ -8,9 +8,7 @@
         "build": "tsc",
         "tx-monitor": "npm run build && node dist/tx-monitor.js",
         "main": "npm run build && node dist/index.js",
-        "test": "npm run build && node dist/index.test.js",
-        "cock": "npm run build && node dist/cock.js",
-        "sell": "npm run build && node dist/sell.js"
+        "test": "npm run build && node dist/test.js"
     },
     "license": "MPL-2.0",
     "devDependencies": {
