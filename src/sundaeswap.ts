@@ -1,26 +1,11 @@
 import { TxAlonzo, TxOut } from "@cardano-ogmios/schema";
 import { Sundae } from "./constants.js";
-import {
-  AssetAmount,
-  IAsset,
-  OrderAddresses,
-  Swap,
-} from "@sundaeswap/sdk-core";
-import {
-  Assets,
-  C,
-  Constr,
-  Data,
-  Lucid,
-  getAddressDetails,
-} from "lucid-cardano";
+import { OrderAddresses, } from "@sundaeswap/sdk-core";
+import { Assets, C, Constr, Data, Lucid, getAddressDetails, } from "lucid-cardano";
 
-const CREATE_POOL_HASH =
-  "d2a93d4de0bcd8309793e832f98a843d23639cb19d9ed3d73d503ac267dcf88d";
+const CREATE_POOL_HASH = "d2a93d4de0bcd8309793e832f98a843d23639cb19d9ed3d73d503ac267dcf88d";
 
-export function isSundaeswapPool(
-  tx: TxAlonzo
-): false | { output: TxOut; poolId: string } {
+export function isSundaeswapPool(tx: TxAlonzo): false | { output: TxOut; poolId: string } {
   if (tx.metadata?.hash !== CREATE_POOL_HASH) {
     return false;
   }
@@ -42,8 +27,11 @@ export function isSundaeswapPool(
   }
 
   const poolId = Object.keys(output.value.assets)
-    .map((asset: String) => asset.split(".").shift())
-    .find((policyId: String) => policyId === Sundae.LP_NFT_POLICY_ID);
+    .filter((asset: String) => asset.split(".").shift() === Sundae.LP_NFT_POLICY_ID)
+    .shift()
+    .split(".")
+    .pop()
+    .substring(4);
 
   return { output, poolId };
 }
@@ -68,8 +56,7 @@ export class Sundaeswap {
     ]);
 
     const orderAssets: Assets = { ["lovelace"]: amount };
-    orderAssets["lovelace"] =
-      (orderAssets["lovelace"] || 0n) + Sundae.SCOOPER_FEE + Sundae.RIDER_FEE;
+    orderAssets["lovelace"] = (orderAssets["lovelace"] || 0n) + Sundae.SCOOPER_FEE + Sundae.RIDER_FEE;
 
     return await this.lucid
       .newTx()
@@ -88,24 +75,18 @@ export class Sundaeswap {
   }
 
   buildOrderAddresses(addresses: OrderAddresses) {
-    this._validateAddressesAreValid(addresses);
     const { DestinationAddress, AlternateAddress } = addresses;
     const destination = getAddressDetails(DestinationAddress.address);
 
     const destinationDatum = new Constr(0, [
       new Constr(0, [
-        new Constr(this._isScriptAddress(DestinationAddress.address) ? 1 : 0, [
-          destination.paymentCredential.hash,
-        ]),
+        new Constr(0, [destination.paymentCredential.hash,]),
         destination?.stakeCredential.hash
           ? new Constr(0, [
-              new Constr(0, [
-                new Constr(
-                  this._isScriptAddress(DestinationAddress.address) ? 1 : 0,
-                  [destination?.stakeCredential.hash]
-                ),
-              ]),
-            ])
+            new Constr(0, [
+              new Constr(0, [destination?.stakeCredential.hash]),
+            ]),
+          ])
           : new Constr(1, []),
       ]),
       DestinationAddress?.datumHash
@@ -128,32 +109,5 @@ export class Sundaeswap {
       )?.to_hex(),
       datum,
     };
-  }
-  private _isScriptAddress(address: string): boolean {
-    // Ensure that the address can be serialized.
-    const realAddress = C.Address.from_bech32(address);
-
-    // Ensure the datumHash is valid HEX if the address is a script.
-    const isScript = (realAddress.to_bytes()[0] & 0b00010000) !== 0;
-
-    return isScript;
-  }
-
-  private _validateAddressesAreValid(orderAddresses: OrderAddresses) {
-    const address = orderAddresses.DestinationAddress.address;
-    const datumHash = orderAddresses.DestinationAddress.datumHash;
-
-    const isScript = this._isScriptAddress(address);
-    if (isScript) {
-      if (datumHash) {
-        try {
-          C.DataHash.from_hex(datumHash);
-        } catch (e) {
-          throw new Error("whoops");
-        }
-      } else {
-        throw new Error("whoops");
-      }
-    }
   }
 }

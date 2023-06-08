@@ -12,6 +12,7 @@ import { Sundaeswap, isSundaeswapPool } from "./sundaeswap.js";
 
 let recentTxs = [];
 let recentPurchases = [];
+const delay = ms => new Promise(res => setTimeout(res, ms));
 
 let ogmios = new Ogmios();
 
@@ -68,9 +69,10 @@ async function processTransaction(tx: TxAlonzo) {
 
   let sundaeOut = isSundaeswapPool(tx);
 
-
   if (sundaeOut) {
+
     let { output, poolId } = sundaeOut;
+    logger.info(`Found SundaeSwap pool with ID: ${poolId}`);
     processSundaeswap(output, poolId);
     return;
   }
@@ -95,15 +97,13 @@ async function processSundaeswap(output: TxOut, poolId: string) {
     return;
   }
 
-  // sendSundaeSwapTx(determinePurchaseAmount(output), asset, poolId).then((txHash: TxHash) => {
-  //   recentPurchases.push(asset);
-  // });
+  sendSundaeSwapTx(determinePurchaseAmount(output), poolId).then((txHash: TxHash) => {
+    recentPurchases.push(asset);
+  });
 
-  // logger.info(
-  //   `Buying ${asset} with an input of ${determinePurchaseAmount(output).toLocaleString()}`
-  // );
-
-
+  logger.info(
+    `Buying ${asset} with an input of ${determinePurchaseAmount(output).toLocaleString()}`
+  );
 }
 
 async function processMinswap(output: TxOut) {
@@ -124,10 +124,6 @@ async function processMinswap(output: TxOut) {
     return;
   }
 
-  if (
-    asset.slice(56) === "5350494359" &&
-    output.value.coins > 300_000_000_000n
-  ) {
     sendMinswapSwapTx(determinePurchaseAmount(output), asset).then((txHash: TxHash) => {
       recentPurchases.push(asset);
     });
@@ -135,7 +131,6 @@ async function processMinswap(output: TxOut) {
     logger.info(
       `Buying ${asset} with an input of ${determinePurchaseAmount(output).toLocaleString()}`
     );
-  }
 }
 
 function determinePurchaseAmount(tx: TxOut): bigint {
@@ -175,38 +170,30 @@ async function sendMinswapSwapTx(amount: bigint, asset: string) {
   return txHash;
 }
 
-// async function sendSundaeSwapTx(amount: bigint, asset: string, poolId: string) {
-//   const lucid: Lucid = await Lucid.new(
-//     new OgmiosProvider(ogmios.submissionClient, ogmios.stateClient),
-//     "Mainnet"
-//   );
-//   const seedPhrase = process.env.SEED_PHRASE;
-//   lucid.selectWalletFromSeed(seedPhrase);
+async function sendSundaeSwapTx(amount: bigint, poolId: string) {
+  const lucid: Lucid = await Lucid.new(
+    new OgmiosProvider(ogmios.submissionClient, ogmios.stateClient),
+    "Mainnet"
+  );
+  const seedPhrase = process.env.SEED_PHRASE;
+  lucid.selectWalletFromSeed(seedPhrase);
+
+
+  let sundaeswap = new Sundaeswap(lucid);
+  let tx = await sundaeswap.buildExactInOrder(poolId, { DestinationAddress: { address: await lucid.wallet.address() } }, amount);
+
+  const signedTx = await tx.sign().complete();
+
+  let txHash = await signedTx.submit();
+
+  if (txHash === null) {
+    return;
+  }
+
+  console.log(txHash);
+  return txHash;
+}
 
 
 
-//   const options = {
-//     sender: await lucid.wallet.address(),
-//     assetIn: {
-//       unit: "lovelace",
-//       quantity: amount,
-//     },
-//     assetOut: asset,
-//     minimumAmountOut: 1n,
-//   };
-
-//   let sundaeswap = new Sundaeswap(lucid);
-//   let tx = await sundaeswap.buildExactInOrder(options);
-
-//   const signedTx = await tx.sign().complete();
-
-//   let txHash = await signedTx.submit();
-
-//   if (txHash === null) {
-//     return;
-//   }
-
-//   console.log(txHash);
-//   return txHash;
-// }
 main();
