@@ -12,8 +12,6 @@ import { Sundaeswap, isSundaeswapPool } from "./sundaeswap.js";
 
 let recentTxs = [];
 let recentPurchases = [];
-const delay = ms => new Promise(res => setTimeout(res, ms));
-
 let ogmios = new Ogmios();
 
 dotenv.config();
@@ -70,7 +68,6 @@ async function processTransaction(tx: TxAlonzo) {
   let sundaeOut = isSundaeswapPool(tx);
 
   if (sundaeOut) {
-
     let { output, poolId } = sundaeOut;
     logger.info(`Found SundaeSwap pool with ID: ${poolId}`);
     processSundaeswap(output, poolId);
@@ -101,9 +98,7 @@ async function processSundaeswap(output: TxOut, poolId: string) {
     recentPurchases.push(asset);
   });
 
-  logger.info(
-    `Buying ${asset} with an input of ${determinePurchaseAmount(output).toLocaleString()}`
-  );
+  logger.info(`Buying ${asset} with an input of ${determinePurchaseAmount(output).toLocaleString()}`);
 }
 
 async function processMinswap(output: TxOut) {
@@ -124,13 +119,11 @@ async function processMinswap(output: TxOut) {
     return;
   }
 
-    sendMinswapSwapTx(determinePurchaseAmount(output), asset).then((txHash: TxHash) => {
-      recentPurchases.push(asset);
-    });
+  sendMinswapSwapTx(determinePurchaseAmount(output), asset).then((txHash: TxHash) => {
+    recentPurchases.push(asset);
+  });
 
-    logger.info(
-      `Buying ${asset} with an input of ${determinePurchaseAmount(output).toLocaleString()}`
-    );
+  logger.info(`Buying ${asset} with an input of ${determinePurchaseAmount(output).toLocaleString()}`);
 }
 
 function determinePurchaseAmount(tx: TxOut): bigint {
@@ -167,6 +160,7 @@ async function sendMinswapSwapTx(amount: bigint, asset: string) {
   }
 
   console.log(txHash);
+  logger.info(`Transaction submitted: ${txHash}`);
   return txHash;
 }
 
@@ -190,10 +184,10 @@ async function sendSundaeSwapTx(amount: bigint, poolId: string) {
     return;
   }
 
+  logger.info(`Transaction submitted: ${txHash}`);
   console.log(txHash);
   return txHash;
 }
-
 
 
 main();
