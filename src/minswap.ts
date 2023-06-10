@@ -1,14 +1,39 @@
-import { TxAlonzo } from "@cardano-ogmios/schema";
+import { TxAlonzo, TxOut } from "@cardano-ogmios/schema";
 import { AddressPlutusData, Min } from "./constants.js";
 import { Constr, Assets, Lucid, TxComplete, Data } from "lucid-cardano";
 import STAKE_ORDER_ADDRESS = Min.STAKE_ORDER_ADDRESS;
 import { BlockfrostAdapter, NetworkId } from "@minswap/blockfrost-adapter";
 
-const CREATE_POOL_HASH = "3f7eb8e720d6384bef1d469229857d694707dd1804aabd649e2a8bdc9846f032";
+const CREATE_POOL_HASH =
+  "3f7eb8e720d6384bef1d469229857d694707dd1804aabd649e2a8bdc9846f032";
 
-export function isMinswapPool(tx: TxAlonzo) {
-  return tx.metadata?.hash === CREATE_POOL_HASH;
+export function isMinswapPool(tx: TxAlonzo): false | TxOut {
+
+  if (tx.metadata?.hash !== CREATE_POOL_HASH) {
+    return false;
+  }
+
+  const output = tx.body.outputs
+    .filter((tx: TxOut) => Object.keys(tx.value.assets).length === 3) // Check if the output contains exactly 3 assets.
+    .filter((tx: TxOut) => tx.value.coins >= 5_000_000_000n) // Check if the ADA value of this output is atleast 5,000 ADA.
+    .filter((tx: TxOut) => {
+      return Object.keys(tx.value.assets)
+        .map((asset: String) => asset.split(".").shift())
+        .some((policyId: String) => policyId === Min.LP_NFT_POLICY_ID); // Check if any asset in the output contains a Minswap LP NFT.
+    })
+    .shift(); // Take the first element. If array is empty, undefined is returned.
+
+  if (output === undefined) {
+    //    Pool creation didn't match all criteria above.
+    //    logger.info(`Pool didn't match our criteria.`);
+    return false;
+  }
+
+
+  return output;
 }
+
+
 
 export class Minswap {
   lucid: Lucid;
