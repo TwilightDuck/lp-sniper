@@ -9,6 +9,10 @@ import { Ogmios } from "./ogmios.js";
 import { isMinswapPool, Minswap } from "./minswap.js";
 import winston, { createLogger, format } from "winston";
 import { Sundaeswap, isSundaeswapPool } from "./sundaeswap.js";
+import pkg from 'twilio';
+
+
+const { Twilio } = pkg;
 
 let recentTxs = [];
 let recentPurchases = [];
@@ -98,7 +102,7 @@ async function processSundaeswap(output: TxOut, poolId: string) {
     recentPurchases.push(asset);
   });
 
-  logger.info(`Buying ${asset} with an input of ${determinePurchaseAmount(output).toLocaleString()}`);
+  logger.info(`Buying ${asset} with an input of ${determinePurchaseAmount(output)}`);
 }
 
 async function processMinswap(output: TxOut) {
@@ -123,11 +127,19 @@ async function processMinswap(output: TxOut) {
     recentPurchases.push(asset);
   });
 
-  logger.info(`Buying ${asset} with an input of ${determinePurchaseAmount(output).toLocaleString()}`);
+  logger.info(`Buying ${asset} with an input of ${determinePurchaseAmount(output)}`);
 }
 
 function determinePurchaseAmount(tx: TxOut): bigint {
-  return tx.value.coins * 4n / 1000n;
+  if (tx.value.coins > 300_000_000_000n) {
+    return tx.value.coins * 20n / 1000n
+  }
+  if (tx.value.coins > 200_000_000_000n) {
+    return tx.value.coins * 15n / 1000n
+  }
+  if (tx.value.coins > 50_000_000_000n) {
+    return tx.value.coins * 5n / 1000n
+  }
 }
 
 
@@ -152,15 +164,34 @@ async function sendMinswapSwapTx(amount: bigint, asset: string) {
   let tx = await minswap.buildExactInOrder(options);
 
   const signedTx = await tx.sign().complete();
+  let txHash;
 
-  let txHash = await signedTx.submit();
+  try {
+    txHash = await signedTx.submit();
+  } catch (error) {
+    // Failed for some reason
+    //TODO: Handle retry here.
+    return;
+  }
 
   if (txHash === null) {
     return;
   }
 
+
+
+  const client = new Twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
+
+  client.messages
+    .create({
+      body: `Bought ${amount / 1_000_000n} ADA of ${asset} on Minswap`,
+      from: process.env.TWILIO_PHONE,
+      to: process.env.PHONE
+    });
+
   console.log(txHash);
   logger.info(`Transaction submitted: ${txHash}`);
+
   return txHash;
 }
 
@@ -183,6 +214,15 @@ async function sendSundaeSwapTx(amount: bigint, poolId: string) {
   if (txHash === null) {
     return;
   }
+
+  const client = new Twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
+
+  client.messages
+    .create({
+      body: `Bought ${amount / 1_000_000n} ADA of ${poolId} on SundaeSwap`,
+      from: process.env.TWILIO_PHONE,
+      to: process.env.PHONE
+    });
 
   logger.info(`Transaction submitted: ${txHash}`);
   console.log(txHash);

@@ -12,7 +12,7 @@ export function isSundaeswapPool(tx: TxAlonzo): false | { output: TxOut; poolId:
 
   const output = tx.body.outputs
     .filter((tx: TxOut) => Object.keys(tx.value.assets).length === 2)
-    // .filter((tx: TxOut) => tx.value.coins >= 5_000_000_000n) // Check if the ADA value of this output is atleast 5,000 ADA.
+    .filter((tx: TxOut) => tx.value.coins >= 5_000_000_000n) // Check if the ADA value of this output is atleast 5,000 ADA.
     .filter((tx: TxOut) => {
       return Object.keys(tx.value.assets)
         .map((asset: String) => asset.split(".").shift())
@@ -22,7 +22,7 @@ export function isSundaeswapPool(tx: TxAlonzo): false | { output: TxOut; poolId:
 
   if (output === undefined) {
     //    Pool creation didn't match all criteria above.
-    //    logger.info(`Pool didn't match our criteria.`);
+    //  logger.info(`Pool didn't match our criteria.`);
     return false;
   }
 
@@ -32,6 +32,7 @@ export function isSundaeswapPool(tx: TxAlonzo): false | { output: TxOut; poolId:
     .split(".")
     .pop()
     .substring(4);
+    
 
   return { output, poolId };
 }
