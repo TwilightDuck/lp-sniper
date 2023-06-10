@@ -8,11 +8,13 @@
         "build": "tsc",
         "tx-monitor": "npm run build && node dist/tx-monitor.js",
         "main": "npm run build && node dist/index.js",
-        "test": "npm run build && node dist/test.js"
+        "test": "npm run build && node dist/test.js",
+        "db": "npm run build && node dist/db.js"
     },
     "license": "MPL-2.0",
     "devDependencies": {
         "@types/node": "^20.2.5",
+        "@types/sqlite3": "^3.1.8",
         "@types/ws": "^8.5.3",
         "prettier": "2.8.8",
         "ts-node": "^10.9.1",
@@ -26,7 +28,10 @@
         "big.js": "^6.1.1",
         "dotenv": "^16.1.0",
         "hex-encoding": "^2.0.2",
+        "lodash": "^4.17.21",
         "lucid-cardano": "^0.10.5",
+        "sqlite": "^4.2.1",
+        "sqlite3": "^5.1.6",
         "string-hex": "^1.0.0",
         "twilio": "^4.11.2",
         "winston": "^3.9.0"
