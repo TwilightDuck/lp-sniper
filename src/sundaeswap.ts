@@ -1,11 +1,21 @@
 import { TxAlonzo, TxOut } from "@cardano-ogmios/schema";
 import { Sundae } from "./constants.js";
-import { OrderAddresses, } from "@sundaeswap/sdk-core";
-import { Assets, C, Constr, Data, Lucid, getAddressDetails, } from "lucid-cardano";
+import { AssetAmount, OrderAddresses } from "@sundaeswap/sdk-core";
+import {
+  Assets,
+  C,
+  Constr,
+  Data,
+  Lucid,
+  getAddressDetails,
+} from "lucid-cardano";
 
-const CREATE_POOL_HASH = "d2a93d4de0bcd8309793e832f98a843d23639cb19d9ed3d73d503ac267dcf88d";
+const CREATE_POOL_HASH =
+  "d2a93d4de0bcd8309793e832f98a843d23639cb19d9ed3d73d503ac267dcf88d";
 
-export function isSundaeswapPool(tx: TxAlonzo): false | { output: TxOut; poolId: string } {
+export function isSundaeswapPool(
+  tx: TxAlonzo
+): false | { output: TxOut; poolId: string } {
   if (tx.metadata?.hash !== CREATE_POOL_HASH) {
     return false;
   }
@@ -27,12 +37,13 @@ export function isSundaeswapPool(tx: TxAlonzo): false | { output: TxOut; poolId:
   }
 
   const poolId = Object.keys(output.value.assets)
-    .filter((asset: String) => asset.split(".").shift() === Sundae.LP_NFT_POLICY_ID)
+    .filter(
+      (asset: String) => asset.split(".").shift() === Sundae.LP_NFT_POLICY_ID
+    )
     .shift()
     .split(".")
     .pop()
     .substring(4);
-    
 
   return { output, poolId };
 }
@@ -45,7 +56,7 @@ export class Sundaeswap {
   }
 
   async buildExactInOrder(
-    ident,
+    ident: string,
     orderAddresses: OrderAddresses,
     amount: bigint
   ) {
@@ -57,7 +68,8 @@ export class Sundaeswap {
     ]);
 
     const orderAssets: Assets = { ["lovelace"]: amount };
-    orderAssets["lovelace"] = (orderAssets["lovelace"] || 0n) + Sundae.SCOOPER_FEE + Sundae.RIDER_FEE;
+    orderAssets["lovelace"] =
+      (orderAssets["lovelace"] || 0n) + Sundae.SCOOPER_FEE + Sundae.RIDER_FEE;
 
     return await this.lucid
       .newTx()
@@ -66,28 +78,19 @@ export class Sundaeswap {
       .complete();
   }
 
-  getAssetSwapDirection({ assetId: assetID }, assets) {
-    const sorted = assets.sort((a, b) => a.assetId.localeCompare(b.assetId));
-    if (sorted[1]?.assetId === assetID) {
-      return 1;
-    }
-
-    return 0;
-  }
-
   buildOrderAddresses(addresses: OrderAddresses) {
     const { DestinationAddress, AlternateAddress } = addresses;
     const destination = getAddressDetails(DestinationAddress.address);
 
     const destinationDatum = new Constr(0, [
       new Constr(0, [
-        new Constr(0, [destination.paymentCredential.hash,]),
+        new Constr(0, [destination.paymentCredential.hash]),
         destination?.stakeCredential.hash
           ? new Constr(0, [
-            new Constr(0, [
-              new Constr(0, [destination?.stakeCredential.hash]),
-            ]),
-          ])
+              new Constr(0, [
+                new Constr(0, [destination?.stakeCredential.hash]),
+              ]),
+            ])
           : new Constr(1, []),
       ]),
       DestinationAddress?.datumHash

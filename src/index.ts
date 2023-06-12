@@ -2,20 +2,19 @@ import * as dotenv from "dotenv";
 import { TxAlonzo, TxOut } from "@cardano-ogmios/schema";
 import { Min } from "./constants.js";
 
-import { Lucid, TxHash } from "lucid-cardano";
+import { Assets, Lucid, TxHash } from "lucid-cardano";
 import * as process from "process";
 import { OgmiosProvider } from "./ogmiosProvider.js";
 import { Ogmios } from "./ogmios.js";
 import { isMinswapPool, Minswap } from "./minswap.js";
 import winston, { createLogger, format } from "winston";
 import { Sundaeswap, isSundaeswapPool } from "./sundaeswap.js";
-import pkg from 'twilio';
-
+import pkg from "twilio";
 
 const { Twilio } = pkg;
 
-let recentTxs = [];
-let recentPurchases = [];
+let recentTxs: Array<TxHash> = [];
+let recentPurchases: Array<string> = [];
 let ogmios = new Ogmios();
 
 dotenv.config();
@@ -61,8 +60,7 @@ async function main() {
 }
 
 async function processTransaction(tx: TxAlonzo) {
-
-  let minswapOut = isMinswapPool(tx)
+  let minswapOut = isMinswapPool(tx);
 
   if (minswapOut) {
     processMinswap(minswapOut);
@@ -80,7 +78,6 @@ async function processTransaction(tx: TxAlonzo) {
 }
 
 async function processSundaeswap(output: TxOut, poolId: string) {
-
   const assets = output.value.assets;
 
   //  Get the asset of the new token.
@@ -98,15 +95,18 @@ async function processSundaeswap(output: TxOut, poolId: string) {
     return;
   }
 
-  sendSundaeSwapTx(determinePurchaseAmount(output), poolId).then((txHash: TxHash) => {
-    recentPurchases.push(asset);
-  });
+  sendSundaeSwapTx(determinePurchaseAmount(output), poolId).then(
+    (txHash: TxHash) => {
+      recentPurchases.push(asset);
+    }
+  );
 
-  logger.info(`Buying ${asset} with an input of ${determinePurchaseAmount(output)}`);
+  logger.info(
+    `Buying ${asset} with an input of ${determinePurchaseAmount(output)}`
+  );
 }
 
 async function processMinswap(output: TxOut) {
-
   const assets = output.value.assets;
 
   //  Get the asset of the new token.
@@ -123,25 +123,30 @@ async function processMinswap(output: TxOut) {
     return;
   }
 
-  sendMinswapSwapTx(determinePurchaseAmount(output), asset).then((txHash: TxHash) => {
-    recentPurchases.push(asset);
-  });
+  sendMinswapSwapTx(determinePurchaseAmount(output), asset).then(
+    (txHash: TxHash) => {
+      recentPurchases.push(asset);
+    }
+  );
 
-  logger.info(`Buying ${asset} with an input of ${determinePurchaseAmount(output)}`);
+  logger.info(
+    `Buying ${asset} with an input of ${determinePurchaseAmount(output)}`
+  );
 }
 
 function determinePurchaseAmount(tx: TxOut): bigint {
   if (tx.value.coins > 300_000_000_000n) {
-    return tx.value.coins * 20n / 1000n
+    return (tx.value.coins * 20n) / 1000n;
   }
   if (tx.value.coins > 200_000_000_000n) {
-    return tx.value.coins * 15n / 1000n
+    return (tx.value.coins * 15n) / 1000n;
   }
   if (tx.value.coins > 50_000_000_000n) {
-    return tx.value.coins * 5n / 1000n
+    return (tx.value.coins * 5n) / 1000n;
   }
-}
 
+  return 0n;
+}
 
 async function sendMinswapSwapTx(amount: bigint, asset: string) {
   const lucid: Lucid = await Lucid.new(
@@ -150,18 +155,12 @@ async function sendMinswapSwapTx(amount: bigint, asset: string) {
   );
   const seedPhrase = process.env.SEED_PHRASE;
   lucid.selectWalletFromSeed(seedPhrase);
-  const options = {
-    sender: await lucid.wallet.address(),
-    assetIn: {
-      unit: "lovelace",
-      quantity: amount,
-    },
-    assetOut: asset,
-    minimumAmountOut: 1n,
-  };
+  sender: await lucid.wallet.address();
+  let assetIn: Assets = { lovelace: amount };
+  let assetOut: Assets = { asset: 1n };
 
   let minswap = new Minswap(lucid);
-  let tx = await minswap.buildExactInOrder(options);
+  let tx = await minswap.buildExactInOrder(assetIn, assetOut, 1n);
 
   const signedTx = await tx.sign().complete();
   let txHash;
@@ -171,23 +170,23 @@ async function sendMinswapSwapTx(amount: bigint, asset: string) {
   } catch (error) {
     // Failed for some reason
     //TODO: Handle retry here.
-    return;
+    return null;
   }
 
   if (txHash === null) {
-    return;
+    return null;
   }
 
+  const client = new Twilio(
+    process.env.TWILIO_ACCOUNT_SID,
+    process.env.TWILIO_AUTH_TOKEN
+  );
 
-
-  const client = new Twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
-
-  client.messages
-    .create({
-      body: `Bought ${amount / 1_000_000n} ADA of ${asset} on Minswap`,
-      from: process.env.TWILIO_PHONE,
-      to: process.env.PHONE
-    });
+  client.messages.create({
+    body: `Bought ${amount / 1_000_000n} ADA of ${asset} on Minswap`,
+    from: process.env.TWILIO_PHONE,
+    to: process.env.PHONE,
+  });
 
   console.log(txHash);
   logger.info(`Transaction submitted: ${txHash}`);
@@ -203,31 +202,35 @@ async function sendSundaeSwapTx(amount: bigint, poolId: string) {
   const seedPhrase = process.env.SEED_PHRASE;
   lucid.selectWalletFromSeed(seedPhrase);
 
-
   let sundaeswap = new Sundaeswap(lucid);
-  let tx = await sundaeswap.buildExactInOrder(poolId, { DestinationAddress: { address: await lucid.wallet.address() } }, amount);
+  let tx = await sundaeswap.buildExactInOrder(
+    poolId,
+    { DestinationAddress: { address: await lucid.wallet.address() } },
+    amount
+  );
 
   const signedTx = await tx.sign().complete();
 
   let txHash = await signedTx.submit();
 
   if (txHash === null) {
-    return;
+    return null;
   }
 
-  const client = new Twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
+  const client = new Twilio(
+    process.env.TWILIO_ACCOUNT_SID,
+    process.env.TWILIO_AUTH_TOKEN
+  );
 
-  client.messages
-    .create({
-      body: `Bought ${amount / 1_000_000n} ADA of ${poolId} on SundaeSwap`,
-      from: process.env.TWILIO_PHONE,
-      to: process.env.PHONE
-    });
+  client.messages.create({
+    body: `Bought ${amount / 1_000_000n} ADA of ${poolId} on SundaeSwap`,
+    from: process.env.TWILIO_PHONE,
+    to: process.env.PHONE,
+  });
 
   logger.info(`Transaction submitted: ${txHash}`);
   console.log(txHash);
   return txHash;
 }
-
 
 main();

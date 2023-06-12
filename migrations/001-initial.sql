@@ -2,13 +2,9 @@ CREATE TABLE test (
     id INTEGER PRIMARY KEY,
     asset TEXT NOT NULL,
     dex TEXT NOT NULL,
-    amount INTEGER,
+    amount DECIMAL,
     quantity DECIMAL,
     price DECIMAL,
-    created_at TIMESTAMP DEFAULT NOW
+    fees DECIMAL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
-
-INSERT INTO
-    test (asset, dex, price)
-VALUES
-    ('asset1', 'minswap', 5000);

@@ -9,10 +9,12 @@
         "tx-monitor": "npm run build && node dist/tx-monitor.js",
         "main": "npm run build && node dist/index.js",
         "test": "npm run build && node dist/test.js",
-        "db": "npm run build && node dist/db.js"
+        "db": "npm run build && node dist/db.js",
+        "dexter": "npm run build && node dist/dexter-test.js"
     },
     "license": "MPL-2.0",
     "devDependencies": {
+        "@types/lodash": "^4.14.195",
         "@types/node": "^20.2.5",
         "@types/sqlite3": "^3.1.8",
         "@types/ws": "^8.5.3",
@@ -23,6 +25,7 @@
     "dependencies": {
         "@blockfrost/blockfrost-js": "^5.3.1",
         "@cardano-ogmios/client": "^5.6.0",
+        "@indigo-labs/dexter": "^1.0.4",
         "@minswap/blockfrost-adapter": "^0.0.6",
         "@sundaeswap/sdk-core": "^0.2.0-alpha.21",
         "big.js": "^6.1.1",

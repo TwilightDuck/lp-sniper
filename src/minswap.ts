@@ -1,6 +1,6 @@
 import { TxAlonzo, TxOut } from "@cardano-ogmios/schema";
 import { AddressPlutusData, Min } from "./constants.js";
-import { Constr, Assets, Lucid, TxComplete, Data } from "lucid-cardano";
+import { Constr, Assets, Lucid, TxComplete, Data, Unit } from "lucid-cardano";
 import STAKE_ORDER_ADDRESS = Min.STAKE_ORDER_ADDRESS;
 import { BlockfrostAdapter, NetworkId } from "@minswap/blockfrost-adapter";
 
@@ -8,7 +8,6 @@ const CREATE_POOL_HASH =
   "3f7eb8e720d6384bef1d469229857d694707dd1804aabd649e2a8bdc9846f032";
 
 export function isMinswapPool(tx: TxAlonzo): false | TxOut {
-
   if (tx.metadata?.hash !== CREATE_POOL_HASH) {
     return false;
   }
@@ -29,11 +28,8 @@ export function isMinswapPool(tx: TxAlonzo): false | TxOut {
     return false;
   }
 
-
   return output;
 }
-
-
 
 export class Minswap {
   lucid: Lucid;
@@ -42,17 +38,19 @@ export class Minswap {
     this.lucid = lucid;
   }
 
-  async buildExactInOrder(options): Promise<TxComplete> {
-    const { assetIn, assetOut, minimumAmountOut } = options;
-    const orderAssets: Assets = { [assetIn.unit]: assetIn.quantity };
-    orderAssets["lovelace"] =
-      (orderAssets["lovelace"] || 0n) + Min.OUTPUT_ADA + Min.BATCHER_FEE;
+  async buildExactInOrder(
+    assetIn: Assets,
+    assetOut: Assets,
+    minimumAmountOut: bigint
+  ): Promise<TxComplete> {
+    assetIn["lovelace"] =
+      (assetIn["lovelace"] || 0n) + Min.OUTPUT_ADA + Min.BATCHER_FEE;
 
     let datum = await this.buildSwapDatum(assetOut, minimumAmountOut);
 
     return await this.lucid
       .newTx()
-      .payToContract(STAKE_ORDER_ADDRESS, Data.to(datum), orderAssets)
+      .payToContract(STAKE_ORDER_ADDRESS, Data.to(datum), assetIn)
       .attachMetadata(674, { msg: [Min.MetadataMessage.SWAP_EXACT_IN_ORDER] })
       .complete();
   }
@@ -66,7 +64,7 @@ export class Minswap {
     orderAssets["lovelace"] =
       (orderAssets["lovelace"] || 0n) + Min.OUTPUT_ADA + Min.BATCHER_FEE;
 
-    let datum = await this.buildSwapDatum("lovelace", minLovelace);
+    let datum = await this.buildSwapDatum(orderAssets, minLovelace);
 
     return await this.lucid
       .newTx()
@@ -75,15 +73,16 @@ export class Minswap {
       .complete();
   }
 
-  private async buildSwapDatum(asset, minAmount: bigint) {
+  private async buildSwapDatum(asset: Assets, minAmount: bigint) {
     let policyid = "";
     let assetname = "";
 
-    if (asset !== "lovelace") {
-      policyid = asset.slice(0, 56);
-      assetname = asset.slice(56);
+    if (!asset["lovelace"]) {
+      policyid = Object.keys(asset)[0].slice(0, 56);
+      assetname = Object.keys(asset)[0].slice(56);
     }
 
+    console.log(asset);
     return new Constr(0, [
       AddressPlutusData.toPlutusData(await this.lucid.wallet.address()),
       AddressPlutusData.toPlutusData(await this.lucid.wallet.address()),
@@ -117,5 +116,7 @@ export class Minswap {
         return a;
       }
     }
+
+    return 0n;
   }
 }

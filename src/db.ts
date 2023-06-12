@@ -1,11 +1,13 @@
 import sqlite from "sqlite3";
 import { open } from "sqlite";
 
-const db = await open({
-  filename: ":memory:",
-  driver: sqlite.Database
-})
+async function init() {
+  const db = await open({
+    filename: ":memory:",
+    driver: sqlite.Database,
+  });
+  await db.migrate();
+  return db;
+}
 
-await db.migrate();
-
-export default db;
+export default await init();

@@ -93,7 +93,7 @@ export class OgmiosProvider implements Provider {
     return blockfrost.getUtxoByUnit(unit);
   }
 
-  async getUtxos(addressOrCredential): Promise<UTxO[]> {
+  async getUtxos(addressOrCredential: Address): Promise<UTxO[]> {
     let blockfrost = new Blockfrost(
       "https://cardano-mainnet.blockfrost.io/api/v0",
       process.env.BLOCKFROST_KEY
@@ -111,7 +111,7 @@ export class OgmiosProvider implements Provider {
     return blockfrost.getUtxosByOutRef(outRefs);
   }
 
-  getUtxosWithUnit(addressOrCredential, unit: Unit): Promise<UTxO[]> {
+  getUtxosWithUnit(addressOrCredential: Address, unit: Unit): Promise<UTxO[]> {
     let blockfrost = new Blockfrost(
       "https://cardano-mainnet.blockfrost.io/api/v0",
       process.env.BLOCKFROST_KEY
@@ -127,28 +127,13 @@ export class OgmiosProvider implements Provider {
       try {
         let blockfrost = new Blockfrost(
           "https://cardano-mainnet.blockfrost.io/api/v0",
-           process.env.BLOCKFROST_KEY);
+          process.env.BLOCKFROST_KEY
+        );
 
         return blockfrost.submitTx(tx);
       } catch (error) {
         throw new Error("Unable to submit");
       }
     }
-  }
-
-  async blockfrostUtxosToUtxos(result) {
-    return await Promise.all(
-      result.map(async (r) => ({
-        txHash: r.tx_hash,
-        outputIndex: r.output_index,
-        assets: Object.fromEntries(
-          r?.amount?.map(({ unit, quantity }) => [unit, BigInt(quantity)]) || []
-        ),
-        address: r.address,
-        datumHash: undefined,
-        datum: undefined,
-        scriptRef: undefined,
-      }))
-    );
   }
 }
