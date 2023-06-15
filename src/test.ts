@@ -46,7 +46,6 @@ async function init() {
   );
 
   console.log(await db.get("SELECT * from test"));
-  console.log(result);
 
   // now monitor for when the assets arrive in the wallet.
 

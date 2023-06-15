@@ -82,7 +82,6 @@ export class Minswap {
       assetname = Object.keys(asset)[0].slice(56);
     }
 
-    console.log(asset);
     return new Constr(0, [
       AddressPlutusData.toPlutusData(await this.lucid.wallet.address()),
       AddressPlutusData.toPlutusData(await this.lucid.wallet.address()),
@@ -101,8 +100,14 @@ export class Minswap {
       projectId: process.env.BLOCKFROST_KEY,
       networkId: NetworkId.MAINNET,
     });
+
+    const MIN_ADA_POOL_ID =
+      "6aa2153e1ae896a95539c9d62f76cedcdabdcdf144e564b8955f609d660cf6a2";
     for (let i = 1; ; i++) {
-      const pools = await api.getPools({ page: i });
+      const pools = await api.getPools({
+        page: i,
+        poolAddress: MIN_ADA_POOL_ID,
+      });
       if (pools.length === 0) {
         break;
       }

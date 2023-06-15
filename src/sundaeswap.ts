@@ -1,6 +1,6 @@
 import { TxAlonzo, TxOut } from "@cardano-ogmios/schema";
 import { Sundae } from "./constants.js";
-import { AssetAmount, OrderAddresses } from "@sundaeswap/sdk-core";
+import { OrderAddresses } from "@sundaeswap/sdk-core";
 import {
   Assets,
   C,

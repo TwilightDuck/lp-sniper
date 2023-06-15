@@ -1,11 +1,14 @@
 {
-    "name": "ogmios-client-starter-kit",
+    "name": "lp-sniper",
     "version": "0.1",
-    "description": "An example start kit for Ogmios with the TypeScript client",
+    "description": "A LP sniper bot on Cardano",
     "main": "src/index.js",
     "type": "module",
+    "files": [
+        "dist/**/*"
+    ],
     "scripts": {
-        "build": "tsc",
+        "build": "tsc --project tsconfig.json && tsc-alias -p tsconfig.json",
         "tx-monitor": "npm run build && node dist/tx-monitor.js",
         "main": "npm run build && node dist/index.js",
         "test": "npm run build && node dist/test.js",
@@ -20,14 +23,15 @@
         "@types/ws": "^8.5.3",
         "prettier": "2.8.8",
         "ts-node": "^10.9.1",
-        "typescript": "^4.9.5"
+        "tsc-alias": "^1.8.6",
+        "typescript": "^5.0.3"
     },
     "dependencies": {
         "@blockfrost/blockfrost-js": "^5.3.1",
         "@cardano-ogmios/client": "^5.6.0",
         "@indigo-labs/dexter": "^1.0.4",
-        "@minswap/blockfrost-adapter": "^0.0.6",
-        "@sundaeswap/sdk-core": "^0.2.0-alpha.21",
+        "@minswap/blockfrost-adapter": "^0.1.0",
+        "@sundaeswap/sdk-core": "^0.2.0-alpha.23",
         "big.js": "^6.1.1",
         "dotenv": "^16.1.0",
         "hex-encoding": "^2.0.2",

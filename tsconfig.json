@@ -1,45 +1,37 @@
 {
+  "compilerOptions": {
+    "module": "ES6",
+    "target": "ESNext",
+    "moduleResolution": "node",
+    "allowJs": true,
+    "noImplicitAny": true,
+    "declaration": true,
+    "noImplicitThis": true,
+    "alwaysStrict": false,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+    "noImplicitReturns": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "allowSyntheticDefaultImports": true,
+    "noFallthroughCasesInSwitch": true,
+    "downlevelIteration": true,
+    "baseUrl": ".",
+    "outDir": "./dist",
+    "declarationMap": false,
+    "noEmitOnError": true
+  },
+  "exclude": ["node_modules", "dist"],
+  "include": ["src/**/*.ts"],
+  "experiments": {
+    "asyncWebAssembly": true,
+    "topLevelAwait": true
+  },
+  "ts-node": {
     "compilerOptions": {
-        "module": "es2020",
-        "target": "es2020",
-        "lib": ["es2020", "DOM"],
-        "moduleResolution": "node",
-        "allowJs": true,
-        "noImplicitAny": true,
-        "declaration": true,
-        "noImplicitThis": true,
-        "alwaysStrict": false,
-        "noUnusedLocals": false,
-        "noUnusedParameters": false,
-        "noImplicitReturns": true,
-        "esModuleInterop": true,
-        "skipLibCheck": true,
-        "forceConsistentCasingInFileNames": true,
-        "resolveJsonModule": true,
-        "allowSyntheticDefaultImports": true,
-        "noFallthroughCasesInSwitch": true,
-        "downlevelIteration": true,
-        "rootDir": "./src",
-        "baseUrl": ".",
-        "outDir": "./dist",
-        "declarationMap": false,
-        "noEmitOnError": true,
-    },
-    "exclude": [
-        "node_modules",
-        "dist"
-    ],
-    "experiments": {
-        "asyncWebAssembly": true,
-        "topLevelAwait": true,
-        "layers": true
-        // optional, with some bundlers/frameworks it doesn't work without
-    },
-    "ts-node": {
-        "esm": true,
-        "compilerOptions": {
-            "module": "ESNext",
-            "target": "ESNext"
-        }
+      "module": "CommonJS"
     }
+  }
 }
