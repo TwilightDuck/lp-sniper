@@ -60,13 +60,17 @@ export namespace LucidCredential {
 export namespace AddressPlutusData {
   export function toPlutusData(address: Address) {
     const addressDetails = getAddressDetails(address);
+    if (addressDetails.paymentCredential === undefined) {
+      throw new Error('Incorrect credentials');
+    }
+
     if (addressDetails.type === "Base") {
       const stakeCredConstr = addressDetails.stakeCredential
         ? new Constr(0, [
-            new Constr(0, [
-              LucidCredential.toPlutusData(addressDetails.stakeCredential),
-            ]),
-          ])
+          new Constr(0, [
+            LucidCredential.toPlutusData(addressDetails.stakeCredential),
+          ]),
+        ])
         : new Constr(1, []);
 
       return new Constr(0, [

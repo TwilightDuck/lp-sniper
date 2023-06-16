@@ -1,30 +1,39 @@
 {
   "compilerOptions": {
-    "module": "ES6",
-    "target": "ESNext",
+    "outDir": "./build",
+    "baseUrl": ".",
+    "module": "es2020",
+    "target": "es2020",
+    "lib": ["es2020", "DOM"],
     "moduleResolution": "node",
     "allowJs": true,
     "noImplicitAny": true,
     "declaration": true,
+    "strict": true,
+    "strictNullChecks": true,
+    "strictFunctionTypes": true,
+    "strictBindCallApply": true,
+    "strictPropertyInitialization": false,
     "noImplicitThis": true,
     "alwaysStrict": false,
     "noUnusedLocals": false,
     "noUnusedParameters": false,
     "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
     "allowSyntheticDefaultImports": true,
-    "noFallthroughCasesInSwitch": true,
-    "downlevelIteration": true,
-    "baseUrl": ".",
-    "outDir": "./dist",
-    "declarationMap": false,
-    "noEmitOnError": true
   },
-  "exclude": ["node_modules", "dist"],
-  "include": ["src/**/*.ts"],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "build"
+  ],
+  "include": [
+    "src/**/*.ts"
+  ],
   "experiments": {
     "asyncWebAssembly": true,
     "topLevelAwait": true

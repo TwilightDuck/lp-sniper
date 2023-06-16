@@ -5,18 +5,23 @@
     "main": "src/index.js",
     "type": "module",
     "files": [
-        "dist/**/*"
+        "build/**/*"
     ],
     "scripts": {
         "build": "tsc --project tsconfig.json && tsc-alias -p tsconfig.json",
-        "tx-monitor": "npm run build && node dist/tx-monitor.js",
-        "main": "npm run build && node dist/index.js",
-        "test": "npm run build && node dist/test.js",
-        "db": "npm run build && node dist/db.js",
-        "dexter": "npm run build && node dist/dexter-test.js"
+        "tx-monitor": "npm run build && node build/tx-monitor.js",
+        "main": "npm run build && node build/index.js",
+        "test": "npm run build && node --es-module-specifier-resolution=node build/test.js",
+        "db": "npm run build && node build/db.js",
+        "dexter": "npm run build && node build/dexter-test.js",
+        "build2": "babel src --out-dir build"
     },
     "license": "MPL-2.0",
     "devDependencies": {
+        "@babel/cli": "^7.22.5",
+        "@babel/core": "^7.22.5",
+        "@babel/preset-env": "^7.22.5",
+        "@babel/preset-typescript": "^7.22.5",
         "@types/lodash": "^4.14.195",
         "@types/node": "^20.2.5",
         "@types/sqlite3": "^3.1.8",

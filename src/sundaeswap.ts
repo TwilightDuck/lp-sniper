@@ -21,12 +21,15 @@ export function isSundaeswapPool(
   }
 
   const output = tx.body.outputs
-    .filter((tx: TxOut) => Object.keys(tx.value.assets).length === 2)
+    .filter((tx: TxOut) => tx.value.assets === undefined ? false : Object.keys(tx.value.assets).length === 2)
     .filter((tx: TxOut) => tx.value.coins >= 5_000_000_000n) // Check if the ADA value of this output is atleast 5,000 ADA.
     .filter((tx: TxOut) => {
+      if (tx.value.assets === undefined) {
+        return false;
+      }
       return Object.keys(tx.value.assets)
         .map((asset: String) => asset.split(".").shift())
-        .some((policyId: String) => policyId === Sundae.LP_NFT_POLICY_ID);
+        .some((policyId) => policyId === Sundae.LP_NFT_POLICY_ID);
     })
     .shift(); // Take the first element. If array is empty, undefined is returned.
 
@@ -36,14 +39,20 @@ export function isSundaeswapPool(
     return false;
   }
 
-  const poolId = Object.keys(output.value.assets)
-    .filter(
-      (asset: String) => asset.split(".").shift() === Sundae.LP_NFT_POLICY_ID
-    )
+  if (output.value.assets === undefined) {
+    return false;
+  }
+  const assets = Object.keys(output.value.assets)
+  if (assets.length === 0) {
+    return false;
+  }
+
+
+  const poolId = assets.filter((asset: string) => asset.split(".").shift() === Sundae.LP_NFT_POLICY_ID)
     .shift()
-    .split(".")
+    ?.split(".")
     .pop()
-    .substring(4);
+    ?.substring(4) || '';
 
   return { output, poolId };
 }
@@ -62,7 +71,7 @@ export class Sundaeswap {
   ) {
     const datum = new Constr(0, [
       ident,
-      this.buildOrderAddresses(orderAddresses).datum,
+      this.buildOrderAddresses(orderAddresses)?.datum || new Constr(0,[]),
       Sundae.SCOOPER_FEE,
       new Constr(0, [new Constr(0, []), amount, new Constr(0, [1n])]),
     ]);
@@ -82,15 +91,19 @@ export class Sundaeswap {
     const { DestinationAddress, AlternateAddress } = addresses;
     const destination = getAddressDetails(DestinationAddress.address);
 
+    if (destination.paymentCredential === undefined || destination.stakeCredential === undefined) {
+      return;
+    }
+
     const destinationDatum = new Constr(0, [
       new Constr(0, [
         new Constr(0, [destination.paymentCredential.hash]),
         destination?.stakeCredential.hash
           ? new Constr(0, [
-              new Constr(0, [
-                new Constr(0, [destination?.stakeCredential.hash]),
-              ]),
-            ])
+            new Constr(0, [
+              new Constr(0, [destination?.stakeCredential.hash]),
+            ]),
+          ])
           : new Constr(1, []),
       ]),
       DestinationAddress?.datumHash
@@ -101,7 +114,7 @@ export class Sundaeswap {
     const alternate = AlternateAddress && getAddressDetails(AlternateAddress);
     const alternateDatum = new Constr(
       alternate ? 0 : 1,
-      alternate ? [alternate.paymentCredential.hash] : []
+      alternate ? [alternate.paymentCredential?.hash || ''] : []
     );
 
     const datum = new Constr(0, [destinationDatum, alternateDatum]);

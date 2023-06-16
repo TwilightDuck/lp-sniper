@@ -13,12 +13,15 @@ export function isMinswapPool(tx: TxAlonzo): false | TxOut {
   }
 
   const output = tx.body.outputs
-    .filter((tx: TxOut) => Object.keys(tx.value.assets).length === 3) // Check if the output contains exactly 3 assets.
+    .filter((tx: TxOut) => tx.value.assets === undefined ? false : Object.keys(tx.value.assets).length === 3) // Check if the output contains exactly 3 assets.
     .filter((tx: TxOut) => tx.value.coins >= 5_000_000_000n) // Check if the ADA value of this output is atleast 5,000 ADA.
     .filter((tx: TxOut) => {
+      if (tx.value.assets === undefined) {
+        return false;
+      }
       return Object.keys(tx.value.assets)
         .map((asset: String) => asset.split(".").shift())
-        .some((policyId: String) => policyId === Min.LP_NFT_POLICY_ID); // Check if any asset in the output contains a Minswap LP NFT.
+        .some((policyId) => policyId === Min.LP_NFT_POLICY_ID); // Check if any asset in the output contains a Minswap LP NFT.
     })
     .shift(); // Take the first element. If array is empty, undefined is returned.
 
@@ -97,7 +100,7 @@ export class Minswap {
 
   async getPrice(asset: string): Promise<BigInt> {
     const api = new BlockfrostAdapter({
-      projectId: process.env.BLOCKFROST_KEY,
+      projectId: process.env.BLOCKFROST_KEY || '',
       networkId: NetworkId.MAINNET,
     });
 

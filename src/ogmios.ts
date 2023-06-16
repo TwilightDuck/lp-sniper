@@ -58,7 +58,7 @@ export class Ogmios {
   private async fetchAllTxs(): Promise<TxAlonzo[]> {
     const tx = await this.monitorClient.nextTx({ fields: "all" });
     if (tx === null) {
-      return null;
+      return [];
     }
 
     return [tx].concat(await this.fetchAllTxs()).filter((e) => e !== null); // recursive function to fetch all transactions until it returns null.

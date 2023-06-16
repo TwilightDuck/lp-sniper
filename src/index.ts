@@ -80,14 +80,24 @@ async function processTransaction(tx: TxAlonzo) {
 async function processSundaeswap(output: TxOut, poolId: string) {
   const assets = output.value.assets;
 
+  if (assets === undefined) {
+    return;
+  }
+
   //  Get the asset of the new token.
   let value = Object.values(assets)
     .filter((v) => v > 1n)
     .shift();
 
+
   const asset = Object.keys(assets)
-    .find((key) => assets[key] === value)
-    .replace(".", "");
+    .find((key: string) => assets[key] === value)
+    ?.replace(".", "");
+
+  if (asset === undefined) {
+    return;
+  }
+
 
   //  Check if we've already purchased this token before.
   if (recentPurchases.includes(asset)) {
@@ -96,7 +106,7 @@ async function processSundaeswap(output: TxOut, poolId: string) {
   }
 
   sendSundaeSwapTx(determinePurchaseAmount(output), poolId).then(
-    (txHash: TxHash) => {
+    (txHash: TxHash | null) => {
       recentPurchases.push(asset);
     }
   );
@@ -109,13 +119,22 @@ async function processSundaeswap(output: TxOut, poolId: string) {
 async function processMinswap(output: TxOut) {
   const assets = output.value.assets;
 
+
+  if (assets === undefined) {
+    return;
+  }
+
   //  Get the asset of the new token.
   let value = Object.values(assets)
     .filter((v) => v > 1n)
     .shift();
   let asset = Object.keys(assets)
     .find((key) => assets[key] === value)
-    .replace(".", "");
+    ?.replace(".", "");
+
+  if (asset === undefined) {
+    return;
+  }
 
   //  Check if we've already purchased this token before.
   if (recentPurchases.includes(asset)) {
@@ -124,8 +143,8 @@ async function processMinswap(output: TxOut) {
   }
 
   sendMinswapSwapTx(determinePurchaseAmount(output), asset).then(
-    (txHash: TxHash) => {
-      recentPurchases.push(asset);
+    (txHash: TxHash | null) => {
+      recentPurchases.push(asset || '');
     }
   );
 
@@ -153,7 +172,7 @@ async function sendMinswapSwapTx(amount: bigint, asset: string) {
     new OgmiosProvider(ogmios.submissionClient, ogmios.stateClient),
     "Mainnet"
   );
-  const seedPhrase = process.env.SEED_PHRASE;
+  const seedPhrase = process.env.SEED_PHRASE || '';
   lucid.selectWalletFromSeed(seedPhrase);
   sender: await lucid.wallet.address();
   let assetIn: Assets = { lovelace: amount };
@@ -185,7 +204,7 @@ async function sendMinswapSwapTx(amount: bigint, asset: string) {
   client.messages.create({
     body: `Bought ${amount / 1_000_000n} ADA of ${asset} on Minswap`,
     from: process.env.TWILIO_PHONE,
-    to: process.env.PHONE,
+    to: process.env.PHONE || '',
   });
 
   console.log(txHash);
@@ -199,7 +218,7 @@ async function sendSundaeSwapTx(amount: bigint, poolId: string) {
     new OgmiosProvider(ogmios.submissionClient, ogmios.stateClient),
     "Mainnet"
   );
-  const seedPhrase = process.env.SEED_PHRASE;
+  const seedPhrase = process.env.SEED_PHRASE || '';
   lucid.selectWalletFromSeed(seedPhrase);
 
   let sundaeswap = new Sundaeswap(lucid);
@@ -225,7 +244,7 @@ async function sendSundaeSwapTx(amount: bigint, poolId: string) {
   client.messages.create({
     body: `Bought ${amount / 1_000_000n} ADA of ${poolId} on SundaeSwap`,
     from: process.env.TWILIO_PHONE,
-    to: process.env.PHONE,
+    to: process.env.PHONE || '',
   });
 
   logger.info(`Transaction submitted: ${txHash}`);
