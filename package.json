@@ -13,8 +13,8 @@
         "main": "npm run build && node build/index.js",
         "test": "npm run build && node --es-module-specifier-resolution=node build/test.js",
         "db": "npm run build && node build/db.js",
-        "dexter": "npm run build && node build/dexter-test.js",
-        "build2": "babel src --out-dir build"
+        "build2": "babel src --out-dir build",
+        "alex": "npm run build && node --es-module-specifier-resolution=node build/alexsell.js"
     },
     "license": "MPL-2.0",
     "devDependencies": {
@@ -34,9 +34,11 @@
     "dependencies": {
         "@blockfrost/blockfrost-js": "^5.3.1",
         "@cardano-ogmios/client": "^5.6.0",
-        "@indigo-labs/dexter": "^1.0.4",
+        "@dcspark/cardano-multiplatform-lib-nodejs": "^3.1.2",
         "@minswap/blockfrost-adapter": "^0.1.0",
-        "@sundaeswap/sdk-core": "^0.2.0-alpha.23",
+        "@sundaeswap/sdk-core": "^0.2.0-alpha.26",
+        "@wingriders/dex-blockfrost-adapter": "^0.3.0",
+        "@wingriders/dex-serializer": "^0.1.4",
         "big.js": "^6.1.1",
         "dotenv": "^16.1.0",
         "hex-encoding": "^2.0.2",

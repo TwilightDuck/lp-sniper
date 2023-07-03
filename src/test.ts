@@ -1,4 +1,4 @@
-import { Assets, Blockfrost, Lucid, Tx, TxComplete, UTxO } from "lucid-cardano";
+import { Assets, Blockfrost, Lucid, Tx, TxComplete, UTxO, fromHex, toText } from "lucid-cardano";
 import { OgmiosProvider } from "./ogmiosProvider.js";
 import * as dotenv from "dotenv";
 import { Minswap } from "./minswap.js";
@@ -6,18 +6,47 @@ import db from "./db.js";
 import { Ogmios } from "./ogmios.js";
 import _ from "lodash";
 import { exit } from "process";
-import { Min } from "./constants.js";
+import { Min, Sundae } from "./constants.js";
 import { BlockFrostAPI } from "@blockfrost/blockfrost-js";
-import { Asset, BlockfrostProvider, Dexter, DexterConfig, LiquidityPool, RequestConfig } from "@indigo-labs/dexter";
-import { query } from "winston";
+import { BlockfrostAdapter as MinswapAdapter, PoolState } from "@minswap/blockfrost-adapter";
+import { IPoolData, SundaeSDK } from "@sundaeswap/sdk-core";
+import { Pool } from "./pool.js";
 
 const delay = (ms: number) => new Promise((res) => setTimeout(res, ms));
 let ogmios = new Ogmios();
 let lucid: Lucid;
 
 
-// This file will buy iUSD with DJED when it's depegged
-// Example: Buy 110 iUSD with 100 DJED. Sell 110 iUSD for 105 DJED later.
+async function index() {
+  dotenv.config();
+  lucid = await setupLucid();
+
+  ogmios.setupOgmios();
+  await db;
+
+
+  const minswapPools = await retrieveMinswapPools();
+  const sundaeswapPools = await retrieveSundaeswapPools();
+
+  minswapPools
+    .filter(p => {
+      const sundae = sundaeswapPools.find(s => s.asset.assetId === p.asset.assetId)
+
+      if (sundae === undefined) {
+        return false;
+      }
+
+      if (Math.abs(p.getPrice() / sundae.getPrice()) < 0.01) {
+        return false;
+      }
+
+      return true;
+    })
+    .filter(p => {
+      console.log(`${toText(p.asset.assetId.substring(57))}:  ${p.getPrice()}`);
+    })
+}
+
 
 
 async function main() {
@@ -96,57 +125,76 @@ async function main() {
   console.log(await db.get("SELECT * from test"));
 }
 
+async function retrieveSundaeswapPools() {
+
+
+  const res: {
+    data?: {
+      poolsPopular: IPoolData[];
+    };
+  } = await fetch("https://stats.sundaeswap.finance/graphql", {
+    method: "POST",
+    body: JSON.stringify({
+      query: Sundae.popularPoolsQuery,
+      variables: {
+        pageSize: 30
+      },
+      operationName: "getPopularPools"
+    }),
+  }).then((res) => res.json()).catch(reason => console.log(reason));
+
+  if (!res?.data) {
+    throw new Error(
+      "Something went wrong when trying to fetch pool data. Full response: " +
+      JSON.stringify(res)
+    );
+  }
+
+
+  return res.data.poolsPopular
+    .map(p => Pool.fromSundaeswap(p))
+    .filter(p => p.quantityADA > 1_000);
+
+}
+
+async function retrieveMinswapPools() {
+
+  const api = new MinswapAdapter({
+    projectId: process.env.BLOCKFROST_KEY!,
+    networkId: 1,
+  });
+
+  let minswapPools = [];
+
+  for (let i = 1; ; i++) {
+    const pools = await api.getPools({
+      page: i,
+      poolAddress: Min.POOL_ADDRESS_LIST[0],
+    });
+
+    if (pools.length === 0) {
+      // last page
+      break;
+    }
+    minswapPools.push(pools);
+  }
+
+  return minswapPools
+    .flat()
+    .filter((p: PoolState) => p.assetA === 'lovelace')
+    .filter((p: PoolState) => p.reserveA > 1_000)
+    .map(p => Pool.fromMinswap(p));
+}
+
 async function setupLucid() {
   const lucid: Lucid = await Lucid.new(
     new OgmiosProvider(ogmios.submissionClient, ogmios.stateClient),
     "Mainnet"
   );
-  const seedPhrase = process.env.SEED_PHRASE || '';
+  const seedPhrase = process.env.SEED_PHRASE!;
   lucid.selectWalletFromSeed(seedPhrase);
 
   return lucid;
-}
-
-async function queryPools() {
-
-  // For each dex we check the price for DJED/iUSD and iUSD/DJED
-  const dexterConfig: DexterConfig = {
-    metadataMsgBranding: 'Bot Season is here',
-  };
-
-  const dexter: Dexter = (new Dexter(dexterConfig))
-    .withDataProvider(new BlockfrostProvider({ projectId: "mainnetcTpxiTqsgqYRGZmKTs1dlyRSMHYslIM2", url: "https://cardano-mainnet.blockfrost.io/api/v0" }));
-
-  const djed = new Asset("8db269c3ec630e06ae29f74bc39edd1f87c819f1056206e879a1cd61", "446a65644d6963726f555344", 6);
-  const iusd = new Asset("f66d78b4a3cb3d37afa0ec36461e51ecbde00f26c8f0a68f94b69880", "69555344", 6);
-
-  console.log(djed);
-  // Basic fetch example
-  let pools = (await dexter.newFetchRequest()
-    .forAllDexs()
-    .getLiquidityPools(djed))
-    .filter((pool) => {
-      let a, b = false;
-      if (pool.assetA instanceof Asset) {
-        a = pool.assetA.policyId === djed.policyId && pool.assetA.assetNameHex === djed.assetNameHex;
-      }
-
-      if (pool.assetB instanceof Asset) {
-        b = pool.assetB.policyId === iusd.policyId && pool.assetB.assetNameHex === iusd.assetNameHex;
-      }
-
-      return a && b;
-    })
-    .forEach((pool: LiquidityPool) => {
-      console.log(pool);
-      console.log(`dex ${pool.dex}`);
-      console.log(`price ${pool.price}`);
-    });
-
-
-
-
-
 }
 
 async function sendMinswapSwapTx(amount: bigint, asset: string) {
@@ -181,5 +229,5 @@ async function sendMinswapSwapTx(amount: bigint, asset: string) {
   console.log(txHash);
   return { txHash: txHash, fee: tx.fee };
 }
-queryPools();
-exit;
+
+index();;

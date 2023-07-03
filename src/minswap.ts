@@ -98,14 +98,14 @@ export class Minswap {
     ]);
   }
 
-  async getPrice(asset: string): Promise<BigInt> {
+  async getPrice(asset: string): Promise<number> {
     const api = new BlockfrostAdapter({
       projectId: process.env.BLOCKFROST_KEY || '',
       networkId: NetworkId.MAINNET,
     });
 
     const MIN_ADA_POOL_ID =
-      "6aa2153e1ae896a95539c9d62f76cedcdabdcdf144e564b8955f609d660cf6a2";
+      "addr1z8snz7c4974vzdpxu65ruphl3zjdvtxw8strf2c2tmqnxz2j2c79gy9l76sdg0xwhd7r0c0kna0tycz4y5s6mlenh8pq0xmsha";
     for (let i = 1; ; i++) {
       const pools = await api.getPools({
         page: i,
@@ -121,10 +121,10 @@ export class Minswap {
 
       if (minADAPool) {
         const [a, b] = await api.getPoolPrice({ pool: minADAPool });
-        return a;
+        return parseFloat(a.toString());
       }
     }
 
-    return 0n;
+    return 0;
   }
 }
