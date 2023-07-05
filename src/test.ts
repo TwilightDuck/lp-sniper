@@ -1,21 +1,23 @@
-import { Assets, Blockfrost, Lucid, Tx, TxComplete, UTxO, fromHex, toText } from "lucid-cardano";
+import { Assets, Lucid, UTxO, toText } from "lucid-cardano";
 import { OgmiosProvider } from "./ogmiosProvider.js";
 import * as dotenv from "dotenv";
 import { Minswap } from "./minswap.js";
 import db from "./db.js";
 import { Ogmios } from "./ogmios.js";
-import _ from "lodash";
-import { exit } from "process";
+import _, { lowerCase } from "lodash";
 import { Min, Sundae } from "./constants.js";
 import { BlockFrostAPI } from "@blockfrost/blockfrost-js";
-import { BlockfrostAdapter as MinswapAdapter, PoolState } from "@minswap/blockfrost-adapter";
+import {
+  BlockfrostAdapter as MinswapAdapter,
+  PoolState,
+} from "@minswap/blockfrost-adapter";
 import { IPoolData, SundaeSDK } from "@sundaeswap/sdk-core";
 import { Pool } from "./pool.js";
+import Big from "big.js";
 
 const delay = (ms: number) => new Promise((res) => setTimeout(res, ms));
 let ogmios = new Ogmios();
 let lucid: Lucid;
-
 
 async function index() {
   dotenv.config();
@@ -24,32 +26,83 @@ async function index() {
   ogmios.setupOgmios();
   await db;
 
-
   const minswapPools = await retrieveMinswapPools();
   const sundaeswapPools = await retrieveSundaeswapPools();
 
   minswapPools
-    .filter(p => {
-      const sundae = sundaeswapPools.find(s => s.asset.assetId === p.asset.assetId)
+    .filter((p) => {
+      const sundae = sundaeswapPools.find(
+        (s) => s.asset.assetId === p.asset.assetId
+      );
 
       if (sundae === undefined) {
         return false;
       }
 
-      if (Math.abs(p.getPrice() / sundae.getPrice()) < 0.01) {
+      const priceDif =
+        Math.abs(p.getPrice() - sundae.getPrice()) /
+        ((p.getPrice() + sundae.getPrice()) / 2);
+      if (priceDif < 0.02 || priceDif > 1) {
         return false;
       }
 
       return true;
     })
-    .filter(p => {
-      console.log(`${toText(p.asset.assetId.substring(57))}:  ${p.getPrice()}`);
-    })
+    .forEach((p) => {
+      const s = sundaeswapPools.find(
+        (s) => s.asset.assetId === p.asset.assetId
+      );
+
+      if (s === undefined) {
+        return;
+      }
+
+      console.log(
+        `${toText(
+          p.asset.assetId.substring(57)
+        )}: Minswap:  ${p.getPrice()}, Sundae: ${s.getPrice()}`
+      );
+
+      const priceDif =
+        Math.abs(p.getPrice() - s.getPrice()) /
+        ((p.getPrice() + s.getPrice()) / 2);
+      console.log("Price difference is " + (priceDif * 100).toFixed(2) + "%");
+      let poolRaise = priceDif / 2;
+      let poolBuyPercentage = poolRaise / 2;
+
+      // In higher pool sell token for ada.
+      // in lower pool buy token with ada.
+
+      // Find pool with lowest price
+      let lowestPool = s;
+      let highestPool = p;
+      if (p.getPrice() < s.getPrice()) {
+        lowestPool = p;
+        highestPool = s;
+      }
+
+      let amountToBuy =
+        (BigInt((poolBuyPercentage * 1000).toFixed(0)) * lowestPool.reserveA) /
+        1000n;
+
+      // If bigger than 100 ADA.
+      if (amountToBuy > 100_000_000n) {
+        amountToBuy = 100_000_000n;
+      }
+
+      console.log(
+        `Buying ${amountToBuy / 1_000_000n} ADA of ${toText(
+          lowestPool.asset.assetId.substring(57)
+        )} from ${lowestPool.dex}`
+      );
+
+      swap(amountToBuy, lowestPool, highestPool).then(() => {
+        console.log("Success?!");
+      });
+    });
 }
 
-
-
-async function main() {
+async function swap(amount: bigint, lowestPool: Pool, highestPool: Pool) {
   dotenv.config();
   lucid = await setupLucid();
 
@@ -57,25 +110,25 @@ async function main() {
   await db;
 
   const blockfrost = new BlockFrostAPI({
-    projectId: process.env.BLOCKFROST_KEY || '',
+    projectId: process.env.BLOCKFROST_KEY || "",
   });
 
-  let asset = "29d222ce763455e3d7a09a665ce554f00ac89d2e99a1a83d267170c64d494e";
-  let amount = 5_000_000n;
+  const assetInfo = await blockfrost.assetsById(lowestPool.assetid);
 
-  const assetInfo = await blockfrost.assetsById(asset);
-
-  const { txHash, fee } = { ...await sendMinswapSwapTx(amount, asset) };
+  const { txHash, fee } = {
+    ...(await sendMinswapSwapTx(amount, lowestPool.assetid)),
+  };
 
   if (txHash === undefined || fee === undefined) {
+    console.log("Failed to buy!");
     return;
   }
 
   const result = await db.run(
     `INSERT INTO test (asset, dex, amount, fees) VALUES (?, ?, ?, ?)`,
     [
-      asset,
-      "minswap",
+      lowestPool.assetid,
+      lowestPool.dex,
       Number(amount / 1000000n),
       (Number(Min.BATCHER_FEE) + fee) / 1_000_000,
     ]
@@ -87,7 +140,7 @@ async function main() {
 
   const oldUtxos = await lucid.provider.getUtxosWithUnit(
     await lucid.wallet.address(),
-    asset
+    lowestPool.assetid
   );
 
   let newUTXO: Array<UTxO> = [];
@@ -96,7 +149,7 @@ async function main() {
     await delay(500);
     const utxos = await lucid.provider.getUtxosWithUnit(
       await lucid.wallet.address(),
-      asset
+      lowestPool.assetid
     );
     newUTXO = utxos
       .filter((obj: UTxO) => obj.txHash !== txHash)
@@ -114,10 +167,11 @@ async function main() {
   );
 
   const price =
-    Number(amount / 1000000n) / Number(purchase.assets[asset] / decimals);
+    Number(amount / 1000000n) /
+    Number(purchase.assets[lowestPool.assetid] / decimals);
 
   await db.run(`UPDATE test SET quantity = ?, price = ? WHERE id = ?`, [
-    Number(purchase.assets[asset] / decimals),
+    Number(purchase.assets[lowestPool.assetid] / decimals),
     price,
     result.lastID,
   ]);
@@ -126,8 +180,6 @@ async function main() {
 }
 
 async function retrieveSundaeswapPools() {
-
-
   const res: {
     data?: {
       poolsPopular: IPoolData[];
@@ -137,28 +189,27 @@ async function retrieveSundaeswapPools() {
     body: JSON.stringify({
       query: Sundae.popularPoolsQuery,
       variables: {
-        pageSize: 30
+        pageSize: 30,
       },
-      operationName: "getPopularPools"
+      operationName: "getPopularPools",
     }),
-  }).then((res) => res.json()).catch(reason => console.log(reason));
+  })
+    .then((res) => res.json())
+    .catch((reason) => console.log(reason));
 
   if (!res?.data) {
     throw new Error(
       "Something went wrong when trying to fetch pool data. Full response: " +
-      JSON.stringify(res)
+        JSON.stringify(res)
     );
   }
 
-
   return res.data.poolsPopular
-    .map(p => Pool.fromSundaeswap(p))
-    .filter(p => p.quantityADA > 1_000);
-
+    .map((p) => Pool.fromSundaeswap(p))
+    .filter((p) => p.reserveA > 1_000);
 }
 
 async function retrieveMinswapPools() {
-
   const api = new MinswapAdapter({
     projectId: process.env.BLOCKFROST_KEY!,
     networkId: 1,
@@ -181,9 +232,9 @@ async function retrieveMinswapPools() {
 
   return minswapPools
     .flat()
-    .filter((p: PoolState) => p.assetA === 'lovelace')
+    .filter((p: PoolState) => p.assetA === "lovelace")
     .filter((p: PoolState) => p.reserveA > 1_000)
-    .map(p => Pool.fromMinswap(p));
+    .map((p) => Pool.fromMinswap(p));
 }
 
 async function setupLucid() {
@@ -202,7 +253,7 @@ async function sendMinswapSwapTx(amount: bigint, asset: string) {
     new OgmiosProvider(ogmios.submissionClient, ogmios.stateClient),
     "Mainnet"
   );
-  const seedPhrase = process.env.SEED_PHRASE || '';
+  const seedPhrase = process.env.SEED_PHRASE || "";
   lucid.selectWalletFromSeed(seedPhrase);
 
   let assetIn: Assets = { lovelace: amount };
@@ -230,4 +281,4 @@ async function sendMinswapSwapTx(amount: bigint, asset: string) {
   return { txHash: txHash, fee: tx.fee };
 }
 
-index();;
+index();
