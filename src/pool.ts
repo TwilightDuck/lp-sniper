@@ -2,10 +2,11 @@ import { PoolState } from "@minswap/blockfrost-adapter";
 import { IPoolData, IPoolDataAsset } from "@sundaeswap/sdk-core";
 import { Min, decimals } from "./constants";
 import Big from "big.js";
+import { getQuoteTokens } from "./tokens";
 
 export class Pool {
-  reserveA: bigint;
-  reserveB: bigint;
+  reserveA: Big;
+  reserveB: Big;
   id: string;
   fee: string | bigint;
   dex: string;
@@ -15,8 +16,8 @@ export class Pool {
   static fromMinswap(minswapPool: PoolState): Pool {
     let pool = new Pool();
 
-    pool.reserveA = minswapPool.reserveA;
-    pool.reserveB = minswapPool.reserveB;
+    pool.reserveA = new Big(minswapPool.reserveA.toString());
+    pool.reserveB = new Big(minswapPool.reserveB.toString());
 
     const assetId =
       minswapPool.assetB.substring(0, 56) +
@@ -25,7 +26,7 @@ export class Pool {
 
     pool.asset = {
       assetId: assetId,
-      decimals: decimals[assetId] ?? 6,
+      decimals: getQuoteTokens().find(q => q.unit === assetId)?.decimals ?? 6,
     };
 
     pool.id = minswapPool.id;
@@ -38,8 +39,8 @@ export class Pool {
   static fromSundaeswap(sundaePool: IPoolData): Pool {
     let pool = new Pool();
 
-    pool.reserveA = BigInt(sundaePool.quantityA);
-    pool.reserveB = BigInt(sundaePool.quantityB);
+    pool.reserveA = new Big(sundaePool.quantityA);
+    pool.reserveB = new Big(sundaePool.quantityB);
 
     pool.asset = {
       assetId: sundaePool.assetB.assetId,
@@ -57,11 +58,7 @@ export class Pool {
 
   public getPrice(): number {
     let decimals = Math.max(1, 10 ** (6 - this.asset.decimals));
-    return (
-      Number((this.reserveA * 1_000_000n) / this.reserveB) /
-      1_000_000 /
-      decimals
-    );
+    return this.reserveA.div(this.reserveB).div(decimals).toNumber();
   }
 
   get assetid(): string {
@@ -69,68 +66,5 @@ export class Pool {
     return (
       this.asset.assetId.substring(0, 56) + this.asset.assetId.substring(57)
     );
-  }
-
-  /**
-   * Get the output amount if we swap a certain amount of a token in the pair
-   * @param assetIn The asset that we want to swap from
-   * @param amountIn The amount that we want to swap from
-   * @returns The amount of the other token that we get from the swap and its price impact
-   */
-  private getAmountOut(
-    assetIn: string,
-    amountIn: bigint
-  ): { amountOut: bigint; priceImpact: Big } {
-    const [reserveIn, reserveOut] =
-      assetIn === "lovelace"
-        ? [this.reserveA, this.reserveB]
-        : [this.reserveB, this.reserveA];
-
-    const amtOutNumerator = amountIn * 997n * reserveOut;
-    const amtOutDenominator = amountIn * 997n + reserveIn * 1000n;
-
-    const priceImpactNumerator =
-      reserveOut * amountIn * amtOutDenominator * 997n -
-      amtOutNumerator * reserveIn * 1000n;
-    const priceImpactDenominator =
-      reserveOut * amountIn * amtOutDenominator * 1000n;
-
-    return {
-      amountOut: amtOutNumerator / amtOutDenominator,
-      priceImpact: new Big(priceImpactNumerator.toString()).div(
-        new Big(priceImpactDenominator.toString())
-      ),
-    };
-  }
-
-  /**
-   * Get the input amount needed if we want to get a certain amount of a token in the pair from swapping
-   * @param assetOut The asset that we want to get from the pair
-   * @param amountOut The amount of assetOut that we want get from the swap
-   * @returns The amount needed of the input token for the swap and its price impact
-   */
-  private getAmountIn(
-    assetOut: string,
-    amountOut: bigint
-  ): { amountIn: bigint; priceImpact: Big } {
-    const [reserveIn, reserveOut] =
-      assetOut === this.asset.assetId
-        ? [this.reserveA, this.reserveB]
-        : [this.reserveB, this.reserveA];
-
-    const amtInNumerator = reserveIn * amountOut * 1000n;
-    const amtInDenominator = (reserveOut - amountOut) * 997n;
-
-    const priceImpactNumerator =
-      reserveOut * amtInNumerator * 997n -
-      amountOut * amtInDenominator * reserveIn * 1000n;
-    const priceImpactDenominator = reserveOut * amtInNumerator * 1000n;
-
-    return {
-      amountIn: amtInNumerator / amtInDenominator + 1n,
-      priceImpact: new Big(priceImpactNumerator.toString()).div(
-        new Big(priceImpactDenominator.toString())
-      ),
-    };
   }
 }

@@ -14,6 +14,13 @@ import {
 import { IPoolData, SundaeSDK } from "@sundaeswap/sdk-core";
 import { Pool } from "./pool.js";
 import Big from "big.js";
+import { calculateAmountIn, calculateProfit } from "./model.js";
+import { getArbitragePairs, getQuoteTokens, initializePairs } from "./tokens.js";
+import { ArbitragePair, Pair } from "./types.js";
+
+
+const ZERO = Big(0);
+const c = Big(2001);
 
 const delay = (ms: number) => new Promise((res) => setTimeout(res, ms));
 let ogmios = new Ogmios();
@@ -26,80 +33,110 @@ async function index() {
   ogmios.setupOgmios();
   await db;
 
-  const minswapPools = await retrieveMinswapPools();
-  const sundaeswapPools = await retrieveSundaeswapPools();
 
-  minswapPools
-    .filter((p) => {
-      const sundae = sundaeswapPools.find(
-        (s) => s.asset.assetId === p.asset.assetId
-      );
+  while (true) {
 
-      if (sundae === undefined) {
-        return false;
-      }
+    await new Promise((resolve) => setTimeout(resolve, 500));
 
-      const priceDif =
-        Math.abs(p.getPrice() - sundae.getPrice()) /
-        ((p.getPrice() + sundae.getPrice()) / 2);
-      if (priceDif < 0.02 || priceDif > 1) {
-        return false;
-      }
+    const minswapPools = await retrieveMinswapPools();
+    const sundaeswapPools = await retrieveSundaeswapPools();
 
-      return true;
-    })
-    .forEach((p) => {
-      const s = sundaeswapPools.find(
-        (s) => s.asset.assetId === p.asset.assetId
-      );
 
-      if (s === undefined) {
-        return;
-      }
+    minswapPools
+      .filter(p => getQuoteTokens().find(q => q.unit === p.asset.assetId))
+      .filter((p) => {
+        const sundae = sundaeswapPools.find(
+          (s) => s.asset.assetId === p.asset.assetId
+        );
 
-      console.log(
-        `${toText(
-          p.asset.assetId.substring(57)
-        )}: Minswap:  ${p.getPrice()}, Sundae: ${s.getPrice()}`
-      );
+        if (sundae === undefined) {
+          return false;
+        }
+        return true;
+      })
+      .forEach((p) => {
+        const s = sundaeswapPools.find(
+          (s) => s.asset.assetId === p.asset.assetId
+        );
 
-      const priceDif =
-        Math.abs(p.getPrice() - s.getPrice()) /
-        ((p.getPrice() + s.getPrice()) / 2);
-      console.log("Price difference is " + (priceDif * 100).toFixed(2) + "%");
-      let poolRaise = priceDif / 2;
-      let poolBuyPercentage = poolRaise / 2;
+        if (s === undefined) {
+          return;
+        }
 
-      // In higher pool sell token for ada.
-      // in lower pool buy token with ada.
+        console.log(
+          `${toText(
+            p.asset.assetId.substring(57)
+          )}: Minswap:  ${p.getPrice().toFixed(6)}, Sundae: ${s.getPrice().toFixed(6)}`
+        );
 
-      // Find pool with lowest price
-      let lowestPool = s;
-      let highestPool = p;
-      if (p.getPrice() < s.getPrice()) {
-        lowestPool = p;
-        highestPool = s;
-      }
 
-      let amountToBuy =
-        (BigInt((poolBuyPercentage * 1000).toFixed(0)) * lowestPool.reserveA) /
-        1000n;
+        let amount01 = calculateAmountIn(p.reserveA, p.reserveB, s.reserveA, s.reserveB, c);
+        let amount10 = calculateAmountIn(s.reserveA, s.reserveB, p.reserveA, p.reserveB, c);
+        let profit01 = calculateProfit(amount01, p.reserveA, p.reserveB, s.reserveA, s.reserveB, c);
+        let profit10 = calculateProfit(amount10, s.reserveA, s.reserveB, p.reserveA, p.reserveB, c);
 
-      // If bigger than 100 ADA.
-      if (amountToBuy > 100_000_000n) {
-        amountToBuy = 100_000_000n;
-      }
+        let amountIn: Big;
+        let profit: Big;
+        let pool: Pool;
+        if (amount01.gt(ZERO)) {
+          amountIn = amount01;
+          profit = profit01;
+          pool = p;
+          console.log('-----------------------------------------------')
+          console.log(`Profit 1: ${amountIn} in for ${profit} profit`);
+        }
+        else if (amount10.gt(ZERO)) {
+          amountIn = amount10;
+          profit = profit10;
+          pool = s;
+          console.log('-----------------------------------------------')
+          console.log(`Profit 2: ${amountIn} in for ${profit} profit`);
+        } else {
+          console.log(`No.`);
+          return;
+        }
 
-      console.log(
-        `Buying ${amountToBuy / 1_000_000n} ADA of ${toText(
-          lowestPool.asset.assetId.substring(57)
-        )} from ${lowestPool.dex}`
-      );
 
-      swap(amountToBuy, lowestPool, highestPool).then(() => {
-        console.log("Success?!");
+        // const priceDif =
+        //   Math.abs(p.getPrice() - s.getPrice()) /
+        //   ((p.getPrice() + s.getPrice()) / 2);
+        // console.log("Price difference is " + (priceDif * 100).toFixed(2) + "%");
+        // let poolRaise = priceDif / 2;
+        // let poolBuyPercentage = poolRaise / 2;
+
+        // // In higher pool sell token for ada.
+        // // in lower pool buy token with ada.
+
+        // // Find pool with lowest price
+        // let lowestPool = s;
+        // let highestPool = p;
+        // if (p.getPrice() < s.getPrice()) {
+        //   lowestPool = p;
+        //   highestPool = s;
+        // }
+
+        // let amountToBuy =
+        //   (BigInt((poolBuyPercentage * 1000).toFixed(0)) * lowestPool.reserveA) /
+        //   1000n;
+
+        // // If bigger than 100 ADA.
+        // if (amountToBuy > 100_000_000n) {
+        //   amountToBuy = 100_000_000n;
+        // }
+
+        // console.log(
+        //   `Buying ${amountToBuy / 1_000_000n} ADA of ${toText(
+        //     lowestPool.asset.assetId.substring(57)
+        //   )} from ${lowestPool.dex}`
+        // );
+
+        // swap(amountToBuy, lowestPool, highestPool).then(() => {
+        //   console.log("Success?!");
+        // });
       });
-    });
+  }
+
+
 }
 
 async function swap(amount: bigint, lowestPool: Pool, highestPool: Pool) {
@@ -189,7 +226,7 @@ async function retrieveSundaeswapPools() {
     body: JSON.stringify({
       query: Sundae.popularPoolsQuery,
       variables: {
-        pageSize: 30,
+        pageSize: 50,
       },
       operationName: "getPopularPools",
     }),
@@ -200,13 +237,12 @@ async function retrieveSundaeswapPools() {
   if (!res?.data) {
     throw new Error(
       "Something went wrong when trying to fetch pool data. Full response: " +
-        JSON.stringify(res)
+      JSON.stringify(res)
     );
   }
 
   return res.data.poolsPopular
-    .map((p) => Pool.fromSundaeswap(p))
-    .filter((p) => p.reserveA > 1_000);
+    .map((p) => Pool.fromSundaeswap(p));
 }
 
 async function retrieveMinswapPools() {
@@ -232,8 +268,7 @@ async function retrieveMinswapPools() {
 
   return minswapPools
     .flat()
-    .filter((p: PoolState) => p.assetA === "lovelace")
-    .filter((p: PoolState) => p.reserveA > 1_000)
+    .filter((p: PoolState) => p.assetA === "lovelace" || p.assetB === "lovelace")
     .map((p) => Pool.fromMinswap(p));
 }
 
@@ -280,5 +315,6 @@ async function sendMinswapSwapTx(amount: bigint, asset: string) {
   console.log(txHash);
   return { txHash: txHash, fee: tx.fee };
 }
+
 
 index();
