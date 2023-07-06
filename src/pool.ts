@@ -3,14 +3,16 @@ import { IPoolData, IPoolDataAsset } from "@sundaeswap/sdk-core";
 import { Min, decimals } from "./constants";
 import Big from "big.js";
 import { getQuoteTokens } from "./tokens";
+import { Token, lovelace } from "./types";
 
 export class Pool {
   reserveA: Big;
   reserveB: Big;
+  tokenA: Token;
+  tokenB: Token;
   id: string;
   fee: string | bigint;
   dex: string;
-  asset: IPoolDataAsset;
   parent: PoolState | IPoolData;
 
   static fromMinswap(minswapPool: PoolState): Pool {
@@ -19,15 +21,7 @@ export class Pool {
     pool.reserveA = new Big(minswapPool.reserveA.toString());
     pool.reserveB = new Big(minswapPool.reserveB.toString());
 
-    const assetId =
-      minswapPool.assetB.substring(0, 56) +
-      "." +
-      minswapPool.assetB.substring(56);
-
-    pool.asset = {
-      assetId: assetId,
-      decimals: getQuoteTokens().find(q => q.unit === assetId)?.decimals ?? 6,
-    };
+    pool.tokenA = minswapPool.assetA === "lovelace" ? lovelace : 
 
     pool.id = minswapPool.id;
     pool.fee = Min.BATCHER_FEE;
