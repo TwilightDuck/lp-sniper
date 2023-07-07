@@ -1,5 +1,4 @@
 import { TxAlonzo, TxOut } from "@cardano-ogmios/schema";
-import { Sundae } from "./constants.js";
 import { OrderAddresses } from "@sundaeswap/sdk-core";
 import {
   Assets,
@@ -9,6 +8,7 @@ import {
   Lucid,
   getAddressDetails,
 } from "lucid-cardano";
+import { Sundae } from "src/constants";
 
 const CREATE_POOL_HASH =
   "d2a93d4de0bcd8309793e832f98a843d23639cb19d9ed3d73d503ac267dcf88d";

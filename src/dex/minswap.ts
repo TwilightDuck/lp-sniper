@@ -1,5 +1,5 @@
 import { TxAlonzo, TxOut } from "@cardano-ogmios/schema";
-import { AddressPlutusData, Min } from "./constants.js";
+import { AddressPlutusData, Min } from "../constants.js";
 import { Constr, Assets, Lucid, TxComplete, Data, Unit } from "lucid-cardano";
 import STAKE_ORDER_ADDRESS = Min.STAKE_ORDER_ADDRESS;
 import { BlockfrostAdapter, NetworkId } from "@minswap/blockfrost-adapter";

@@ -6,10 +6,10 @@ import { Assets, Lucid, TxHash } from "lucid-cardano";
 import * as process from "process";
 import { OgmiosProvider } from "./ogmiosProvider.js";
 import { Ogmios } from "./ogmios.js";
-import { isMinswapPool, Minswap } from "./minswap.js";
+import { isMinswapPool, Minswap } from "./dex/minswap.js";
 import winston, { createLogger, format } from "winston";
-import { Sundaeswap, isSundaeswapPool } from "./sundaeswap.js";
 import pkg from "twilio";
+import { Sundaeswap, isSundaeswapPool } from "./dex/sundaeswap.js";
 
 const { Twilio } = pkg;
 
