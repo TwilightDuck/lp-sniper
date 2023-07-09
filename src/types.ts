@@ -3,12 +3,12 @@ import Big from "big.js";
 
 export class Asset {
   public policyId: string;
-  public assetNameHex: string;
+  public nameHex: string;
   public decimals: number;
 
   constructor(policyId: string, assetNameHex: string, decimals: number = 0) {
     this.policyId = policyId;
-    this.assetNameHex = assetNameHex;
+    this.nameHex = assetNameHex;
     this.decimals = decimals;
   }
 
@@ -19,11 +19,11 @@ export class Asset {
   }
 
   id(dilimeter: "" | "." = ""): string {
-    return this.policyId + dilimeter + this.assetNameHex;
+    return this.policyId + dilimeter + this.nameHex;
   }
 
   get assetName(): string {
-    return Buffer.from(this.assetNameHex, "hex").toString();
+    return Buffer.from(this.nameHex, "hex").toString();
   }
 }
 

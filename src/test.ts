@@ -37,12 +37,12 @@ async function index() {
 
   const dexterConfig: DexterConfig = {
     shouldFetchMetadata: true, // Whether to fetch asset metadata (Best to leave this `true` for accurate pool info)
-    shouldFallbackToApi: true, // Only use when using Blockfrost or Kupo as data providers. On failure, fallback to the DEX API to grab necessary data
+    shouldFallbackToApi: false, // Only use when using Blockfrost or Kupo as data providers. On failure, fallback to the DEX API to grab necessary data
     shouldSubmitOrders: false, // Allow Dexter to submit orders from swap requests. Useful during development
     metadataMsgBranding: "Dexter", // Prepend branding name in Tx message
   };
   const requestConfig: RequestConfig = {
-    timeout: 5000, // How long outside network requests have to reply
+    timeout: 120000, // How long outside network requests have to reply
     proxyUrl: "", // URL to prepend to all outside URLs. Useful when dealing with CORs
   };
 
@@ -58,31 +58,23 @@ async function index() {
     // )
     .withDataProvider(new KupoProvider({ url: "http://192.168.1.73:1442" }))
     .newFetchRequest()
-    .forDexs(["Minswap", "SundaeSwap"])
+    // .onAllDexs()
+    .onDexs(["WingRiders", 'SundaeSwap'])
     .getLiquidityPools();
 
   console.log(`Minswap:  ${pools.filter((p) => p.dex == "Minswap").length}`);
-  console.log(
-    `SundaeSwap:  ${pools.filter((p) => p.dex == "SundaeSwap").length}`
-  );
-  console.log(
-    `MuesliSwap:  ${pools.filter((p) => p.dex == "MuesliSwap").length}`
-  );
-  console.log(
-    `VyFinance:  ${pools.filter((p) => p.dex == "VyFinance").length}`
-  );
-  console.log(
-    `WingRiders:  ${pools.filter((p) => p.dex == "WingRiders").length}`
-  );
+  console.log(`SundaeSwap:  ${pools.filter((p) => p.dex == "SundaeSwap").length}`);
+  console.log(`MuesliSwap:  ${pools.filter((p) => p.dex == "MuesliSwap").length}`);
+  console.log(`VyFinance:  ${pools.filter((p) => p.dex == "VyFinance").length}`);
+  console.log(`WingRiders:  ${pools.filter((p) => p.dex == "WingRiders").length}`);
   console.log(`Total:  ${pools.length}`);
 
-  console.log("pools:", pools.length);
 
-  pools = pools.filter((p) => {
-    p.totalLpTokens > 0n;
-  });
 
-  const trades = findArb(pools, "lovelace", "lovelace", 3, pools, [], []);
+  const trades = findArb(pools, "lovelace", "lovelace", 10, pools, ["lovelace"], []);
+
+  console.log(`Trades: ${trades.length}`)
+
   if (trades.length === 0) {
     return;
   }
@@ -93,149 +85,6 @@ async function index() {
   if (trade && Number(trade["profit"]) / Math.pow(10, 6) >= 1) {
     console.log(trade);
   }
-}
-
-// const minswapPools = await retrieveMinswapPools();
-// const sundaeswapPools = await retrieveSundaeswapPools();
-
-// const pools = [...minswapPools, ...sundaeswapPools];
-
-// console.log(
-//   pools.filter((p) => p.tokenA?.assetName == "MIN" || p.tokenB.assetName == "MIN")
-// );
-
-// async function swap(amount: bigint, lowestPool: Pool, highestPool: Pool) {
-//   dotenv.config();
-//   lucid = await setupLucid();
-
-//   ogmios.setupOgmios();
-//   await db;
-
-//   const blockfrost = new BlockFrostAPI({
-//     projectId: process.env.BLOCKFROST_KEY || "",
-//   });
-
-//   const assetInfo = await blockfrost.assetsById(lowestPool.assetid);
-
-//   const { txHash, fee } = {
-//     ...(await sendMinswapSwapTx(amount, lowestPool.assetid)),
-//   };
-
-//   if (txHash === undefined || fee === undefined) {
-//     console.log("Failed to buy!");
-//     return;
-//   }
-
-//   const result = await db.run(
-//     `INSERT INTO test (asset, dex, amount, fees) VALUES (?, ?, ?, ?)`,
-//     [
-//       lowestPool.assetid,
-//       lowestPool.dex,
-//       Number(amount / 1000000n),
-//       (Number(Min.BATCHER_FEE) + fee) / 1_000_000,
-//     ]
-//   );
-
-//   console.log(await db.get("SELECT * from test"));
-
-//   // now monitor for when the assets arrive in the wallet.
-
-//   const oldUtxos = await lucid.provider.getUtxosWithUnit(
-//     await lucid.wallet.address(),
-//     lowestPool.assetid
-//   );
-
-//   let newUTXO: Array<UTxO> = [];
-
-//   while (newUTXO.length === 0) {
-//     await delay(500);
-//     const utxos = await lucid.provider.getUtxosWithUnit(
-//       await lucid.wallet.address(),
-//       lowestPool.assetid
-//     );
-//     newUTXO = utxos
-//       .filter((obj: UTxO) => obj.txHash !== txHash)
-//       .filter(function (obj: UTxO) {
-//         return !oldUtxos.some((obj2: UTxO) => obj.txHash == obj2.txHash);
-//       });
-//   }
-
-//   const purchase: UTxO = newUTXO[0];
-
-//   const decimals = BigInt(
-//     assetInfo.metadata?.decimals == 1
-//       ? 1
-//       : Math.pow(10, assetInfo.metadata?.decimals || 0)
-//   );
-
-//   const price =
-//     Number(amount / 1000000n) /
-//     Number(purchase.assets[lowestPool.assetid] / decimals);
-
-//   await db.run(`UPDATE test SET quantity = ?, price = ? WHERE id = ?`, [
-//     Number(purchase.assets[lowestPool.assetid] / decimals),
-//     price,
-//     result.lastID,
-//   ]);
-
-//   console.log(await db.get("SELECT * from test"));
-// }
-
-async function retrieveSundaeswapPools() {
-  const res: {
-    data?: {
-      poolsPopular: IPoolData[];
-    };
-  } = await fetch("https://stats.sundaeswap.finance/graphql", {
-    method: "POST",
-    body: JSON.stringify({
-      query: Sundae.popularPoolsQuery,
-      variables: {
-        pageSize: 50,
-      },
-      operationName: "getPopularPools",
-    }),
-  })
-    .then((res) => res.json())
-    .catch((reason) => console.log(reason));
-
-  if (!res?.data) {
-    throw new Error(
-      "Something went wrong when trying to fetch pool data. Full response: " +
-        JSON.stringify(res)
-    );
-  }
-
-  return res.data.poolsPopular
-    .map((p) => Pool.fromSundaeswap(p, tokens))
-    .filter((item): item is Pool => !!item);
-}
-
-async function retrieveMinswapPools() {
-  const api = new MinswapAdapter({
-    projectId: process.env.BLOCKFROST_KEY!,
-    networkId: 1,
-  });
-
-  let minswapPools = [];
-
-  for (let i = 1; ; i++) {
-    const pools = await api.getPools({
-      page: i,
-      poolAddress: Min.POOL_ADDRESS_LIST[0],
-    });
-
-    if (pools.length === 0) {
-      // last page
-      break;
-    }
-    minswapPools.push(pools);
-  }
-
-  return minswapPools
-    .flat()
-    .map((p) => Pool.fromMinswap(p, tokens))
-    .filter((item): item is Pool => !!item);
 }
 
 async function setupLucid() {
@@ -298,18 +147,16 @@ function findArb(
   currentPools: LiquidityPool[],
   path: Token[],
   bestTrades: Trade[],
-  count: number = 5
+  count: number = 20
 ): Trade[] {
   for (let i = 0; i < pools.length; i++) {
     let newPath = [...path];
     let pool = pools[i];
 
-    console.log(pool);
-
     const assetADecimal = pool.assetA == "lovelace" ? 6 : pool.assetA.decimals;
     const assetBDecimal = pool.assetB == "lovelace" ? 6 : pool.assetB.decimals;
 
-    if (pool.assetA !== tokenIn && pool.assetB !== tokenIn) {
+    if (pool.assetA != tokenIn && pool.assetB != tokenIn) {
       continue;
     }
     if (
@@ -320,15 +167,23 @@ function findArb(
     }
 
     let tempOut: Token;
-    if (tokenIn === pool.assetA) {
+
+
+    if (tokenIn == pool.assetA) {
       tempOut = pool.assetB;
     } else {
       tempOut = pool.assetA;
     }
 
+
+
+
     newPath.push(tempOut);
 
-    if (tempOut === tokenOut && path.length > 2) {
+    if (tempOut == tokenOut && path.length > 2) {
+      console.log(`Arb ${i}`);
+
+
       let [Ea, Eb] = getEaEb(tokenOut, [...currentPools, pool]);
       let newTrade: Trade = {
         route: [...currentPools, pool],
@@ -356,9 +211,9 @@ function findArb(
         bestTrades = bestTrades.slice(0, count);
       }
     } else if (maxHops > 1 && pools.length > 1) {
-      let poolsExcludingThisPair = pools.slice(0, i).concat(pools.slice(i + 1));
+      pools.splice(i, 1);
       bestTrades = findArb(
-        poolsExcludingThisPair,
+        pools,
         tempOut,
         tokenOut,
         maxHops - 1,
